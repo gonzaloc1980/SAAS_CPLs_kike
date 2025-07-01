@@ -9,7 +9,96 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      cpls: {
+        Row: {
+          audio_texto: string | null
+          audio_url: string | null
+          created_at: string
+          destinatario_persona_grupo: string | null
+          dia_semana: string
+          fecha_inicio: string
+          fecha_termino: string
+          hora: string
+          id: string
+          imagen_texto: string | null
+          imagen_url: string | null
+          mensaje_x_dia: string | null
+          texto_video: string | null
+          tipo_cpl: string[]
+          updated_at: string
+          user_id: string
+          youtube_url: string | null
+        }
+        Insert: {
+          audio_texto?: string | null
+          audio_url?: string | null
+          created_at?: string
+          destinatario_persona_grupo?: string | null
+          dia_semana: string
+          fecha_inicio: string
+          fecha_termino: string
+          hora: string
+          id?: string
+          imagen_texto?: string | null
+          imagen_url?: string | null
+          mensaje_x_dia?: string | null
+          texto_video?: string | null
+          tipo_cpl: string[]
+          updated_at?: string
+          user_id: string
+          youtube_url?: string | null
+        }
+        Update: {
+          audio_texto?: string | null
+          audio_url?: string | null
+          created_at?: string
+          destinatario_persona_grupo?: string | null
+          dia_semana?: string
+          fecha_inicio?: string
+          fecha_termino?: string
+          hora?: string
+          id?: string
+          imagen_texto?: string | null
+          imagen_url?: string | null
+          mensaje_x_dia?: string | null
+          texto_video?: string | null
+          tipo_cpl?: string[]
+          updated_at?: string
+          user_id?: string
+          youtube_url?: string | null
+        }
+        Relationships: []
+      }
+      grupos: {
+        Row: {
+          created_at: string
+          estado: string
+          id: string
+          id_grupo: string | null
+          nombre: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          estado?: string
+          id?: string
+          id_grupo?: string | null
+          nombre: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          estado?: string
+          id?: string
+          id_grupo?: string | null
+          nombre?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
