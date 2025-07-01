@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      contact_requests: {
+        Row: {
+          correo: string
+          created_at: string
+          estado: string
+          id: string
+          mensaje: string | null
+          nombre: string
+          whatsapp: string
+        }
+        Insert: {
+          correo: string
+          created_at?: string
+          estado?: string
+          id?: string
+          mensaje?: string | null
+          nombre: string
+          whatsapp: string
+        }
+        Update: {
+          correo?: string
+          created_at?: string
+          estado?: string
+          id?: string
+          mensaje?: string | null
+          nombre?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       cpls: {
         Row: {
           audio_texto: string | null

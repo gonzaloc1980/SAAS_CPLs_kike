@@ -2,7 +2,8 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Users, Video, Image, Music } from "lucide-react";
+import { Calendar, Users, Video, Image, LogIn } from "lucide-react";
+import ContactForm from "@/components/ContactForm";
 
 const Index = () => {
   return (
@@ -19,16 +20,8 @@ const Index = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/auth">
               <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3">
-                Comenzar Ahora
-              </Button>
-            </Link>
-            <Link to="/auth">
-              <Button 
-                size="lg" 
-                variant="outline" 
-                className="border-gray-700 text-gray-300 hover:bg-gray-800 text-lg px-8 py-3"
-              >
-                Iniciar Sesión
+                <LogIn className="h-5 w-5 mr-2" />
+                Acceso de Administrador
               </Button>
             </Link>
           </div>
@@ -84,6 +77,19 @@ const Index = () => {
           </Card>
         </div>
 
+        {/* Sección del formulario de contacto */}
+        <div className="mb-16">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-bold text-white mb-4">
+              ¿Interesado en CPL Manager?
+            </h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+              Solicita una asesoría personalizada y descubre cómo CPL Manager puede transformar tu gestión de contenido multimedia
+            </p>
+          </div>
+          <ContactForm />
+        </div>
+
         <div className="text-center">
           <Card className="bg-gray-900 border-gray-800 max-w-4xl mx-auto">
             <CardHeader>
@@ -120,7 +126,7 @@ const Index = () => {
                     Seguridad Total
                   </h3>
                   <p className="text-gray-400">
-                    Autenticación segura y almacenamiento privado para cada usuario.
+                    Autenticación segura y almacenamiento privado para cada usuario autorizado.
                   </p>
                 </div>
               </div>
