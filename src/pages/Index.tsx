@@ -21,7 +21,7 @@ const Index = () => {
             <Link to="/auth">
               <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3">
                 <LogIn className="h-5 w-5 mr-2" />
-                Acceso de Administrador
+                Iniciar Sesión
               </Button>
             </Link>
           </div>
