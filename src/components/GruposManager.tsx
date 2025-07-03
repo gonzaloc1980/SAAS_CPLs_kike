@@ -70,6 +70,23 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
           });
 
         if (error) throw error;
+        
+        // Llamar al webhook después de crear el grupo exitosamente
+        try {
+          await fetch('https://agendador-n8n.6qgqpv.easypanel.host/webhook/f548d0ac-d7d1-4667-84ea-99b5640aba24', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              user_id: userId
+            }),
+          });
+        } catch (webhookError) {
+          console.error('Error al llamar al webhook:', webhookError);
+          // No mostramos error al usuario para no interrumpir el flujo
+        }
+        
         toast.success('Grupo creado exitosamente');
       }
 
