@@ -62,12 +62,14 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
         if (error) throw error;
         toast.success('Grupo actualizado exitosamente');
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('grupos')
           .insert({
             nombre,
             user_id: userId
-          });
+          })
+          .select()
+          .single();
 
         if (error) throw error;
         
@@ -79,7 +81,8 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              user_id: userId
+              user_id: userId,
+              id: data.id
             }),
           });
         } catch (webhookError) {
