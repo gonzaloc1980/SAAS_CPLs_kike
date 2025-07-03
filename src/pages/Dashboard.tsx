@@ -9,11 +9,13 @@ import { LogOut, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import GruposManager from '@/components/GruposManager';
 import CplsManager from '@/components/CplsManager';
+import VincularManager from '@/components/VincularManager';
 
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -21,6 +23,10 @@ const Dashboard = () => {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        if (session?.user) {
+          fetchUserProfile(session.user.id);
+        }
       }
     );
 
@@ -28,10 +34,48 @@ const Dashboard = () => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching user profile:', error);
+        return;
+      }
+
+      if (!data) {
+        // Create profile if it doesn't exist
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({ user_id: userId })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating user profile:', createError);
+          return;
+        }
+        setUserProfile(newProfile);
+      } else {
+        setUserProfile(data);
+      }
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+    }
+  };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -72,7 +116,7 @@ const Dashboard = () => {
 
       <main className="max-w-7xl mx-auto p-4">
         <Tabs defaultValue="cpls" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-gray-900 border-gray-800">
+          <TabsList className={`grid w-full ${userProfile?.vinculado === false ? 'grid-cols-3' : 'grid-cols-2'} bg-gray-900 border-gray-800`}>
             <TabsTrigger 
               value="cpls" 
               className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
@@ -85,6 +129,14 @@ const Dashboard = () => {
             >
               Grupos
             </TabsTrigger>
+            {userProfile?.vinculado === false && (
+              <TabsTrigger 
+                value="vincular" 
+                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+              >
+                Vincular
+              </TabsTrigger>
+            )}
           </TabsList>
           
           <TabsContent value="cpls" className="mt-6">
@@ -94,6 +146,12 @@ const Dashboard = () => {
           <TabsContent value="grupos" className="mt-6">
             <GruposManager userId={user.id} />
           </TabsContent>
+          
+          {userProfile?.vinculado === false && (
+            <TabsContent value="vincular" className="mt-6">
+              <VincularManager userId={user.id} />
+            </TabsContent>
+          )}
         </Tabs>
       </main>
     </div>
