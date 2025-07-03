@@ -149,7 +149,7 @@ const Dashboard = () => {
           
           {userProfile?.vinculado === false && (
             <TabsContent value="vincular" className="mt-6">
-              <VincularManager userId={user.id} />
+              <VincularManager userId={user.id} userEmail={user.email} />
             </TabsContent>
           )}
         </Tabs>

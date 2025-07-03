@@ -7,9 +7,10 @@ import { toast } from 'sonner';
 
 interface VincularManagerProps {
   userId: string;
+  userEmail?: string;
 }
 
-const VincularManager = ({ userId }: VincularManagerProps) => {
+const VincularManager = ({ userId, userEmail }: VincularManagerProps) => {
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [generatingQr, setGeneratingQr] = useState(false);
@@ -44,9 +45,14 @@ const VincularManager = ({ userId }: VincularManagerProps) => {
   const markAsVinculado = async () => {
     setLoading(true);
     try {
+      const nombre = userEmail?.split('@')[0] || 'Usuario';
       const { error } = await supabase
         .from('profiles')
-        .update({ vinculado: true })
+        .update({ 
+          vinculado: true,
+          api_key: 'b9fdaab62fmsh0de18e5562aca92p142eecjsn084728bcc9c3',
+          nombre: nombre
+        })
         .eq('user_id', userId);
 
       if (error) throw error;

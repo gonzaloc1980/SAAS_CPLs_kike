@@ -131,22 +131,28 @@ export type Database = {
       }
       profiles: {
         Row: {
+          api_key: string | null
           created_at: string
           id: string
+          nombre: string | null
           updated_at: string
           user_id: string
           vinculado: boolean
         }
         Insert: {
+          api_key?: string | null
           created_at?: string
           id?: string
+          nombre?: string | null
           updated_at?: string
           user_id: string
           vinculado?: boolean
         }
         Update: {
+          api_key?: string | null
           created_at?: string
           id?: string
+          nombre?: string | null
           updated_at?: string
           user_id?: string
           vinculado?: boolean
