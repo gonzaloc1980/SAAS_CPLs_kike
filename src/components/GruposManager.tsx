@@ -66,7 +66,8 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
           .from('grupos')
           .insert({
             nombre,
-            user_id: userId
+            user_id: userId,
+            estado: 'Creando...'
           })
           .select()
           .single();
@@ -91,6 +92,12 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
         }
         
         toast.success('Grupo creado exitosamente');
+        
+        // Hacer refresh automático después de 20 segundos
+        setTimeout(() => {
+          fetchGrupos();
+          toast.info('Actualizando estado de grupos...');
+        }, 20000);
       }
 
       resetForm();
@@ -202,23 +209,20 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
                     <h3 className="text-lg font-semibold text-white mb-2">
                       {grupo.nombre}
                     </h3>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      <Badge
-                        variant={grupo.estado === 'Creado' ? 'default' : 'secondary'}
-                        className={
-                          grupo.estado === 'Creado'
-                            ? 'bg-green-600 text-white'
-                            : 'bg-gray-600 text-gray-200'
-                        }
-                      >
-                        {grupo.estado}
-                      </Badge>
-                      {grupo.id_grupo && (
-                        <Badge variant="outline" className="border-blue-500 text-blue-400">
-                          ID: {grupo.id_grupo}
-                        </Badge>
-                      )}
-                    </div>
+                     <div className="flex flex-wrap gap-2 mb-2">
+                       <Badge
+                         variant={grupo.estado === 'Creado' ? 'default' : 'secondary'}
+                         className={
+                           grupo.estado === 'Creado'
+                             ? 'bg-green-600 text-white'
+                             : grupo.estado === 'Creando...'
+                             ? 'bg-yellow-600 text-white'
+                             : 'bg-gray-600 text-gray-200'
+                         }
+                       >
+                         {grupo.estado}
+                       </Badge>
+                     </div>
                     <p className="text-sm text-gray-400">
                       Creado: {new Date(grupo.created_at).toLocaleDateString()}
                     </p>
