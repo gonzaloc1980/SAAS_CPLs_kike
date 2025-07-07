@@ -176,8 +176,8 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
                       <div className="flex items-center gap-2 text-gray-300">
                         <Calendar className="h-4 w-4" />
                         <span>
-                          {new Date(cpl.fecha_inicio).toLocaleDateString()} - {' '}
-                          {new Date(cpl.fecha_termino).toLocaleDateString()}
+                          {new Date(cpl.fecha_inicio + 'T00:00:00').toLocaleDateString()} - {' '}
+                          {new Date(cpl.fecha_termino + 'T00:00:00').toLocaleDateString()}
                         </span>
                       </div>
                       

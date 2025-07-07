@@ -60,8 +60,8 @@ const TIPOS_CPL = [
 
 const CplForm = ({ userId, grupos, editingCpl, onClose, onSuccess }: CplFormProps) => {
   const [formData, setFormData] = useState({
-    fecha_inicio: editingCpl ? new Date(editingCpl.fecha_inicio) : new Date(),
-    fecha_termino: editingCpl ? new Date(editingCpl.fecha_termino) : new Date(),
+    fecha_inicio: editingCpl ? new Date(editingCpl.fecha_inicio + 'T00:00:00') : new Date(),
+    fecha_termino: editingCpl ? new Date(editingCpl.fecha_termino + 'T00:00:00') : new Date(),
     dia_semana: editingCpl?.dia_semana || '',
     hora: editingCpl?.hora || '',
     tipo_cpl: editingCpl?.tipo_cpl || [],
@@ -131,8 +131,8 @@ const CplForm = ({ userId, grupos, editingCpl, onClose, onSuccess }: CplFormProp
       }
 
       const cplData = {
-        fecha_inicio: formData.fecha_inicio.toISOString().split('T')[0],
-        fecha_termino: formData.fecha_termino.toISOString().split('T')[0],
+        fecha_inicio: formData.fecha_inicio.toLocaleDateString('en-CA'),
+        fecha_termino: formData.fecha_termino.toLocaleDateString('en-CA'),
         dia_semana: formData.dia_semana,
         hora: formData.hora,
         tipo_cpl: formData.tipo_cpl,
