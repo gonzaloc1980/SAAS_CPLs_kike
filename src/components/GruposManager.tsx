@@ -76,7 +76,7 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
         
         // Llamar al webhook después de crear el grupo exitosamente
         try {
-          await fetch('https://agendador-n8n.6qgqpv.easypanel.host/webhook/f548d0ac-d7d1-4667-84ea-99b5640aba24', {
+          const webhookResponse = await fetch('https://agendador-n8n.6qgqpv.easypanel.host/webhook/f548d0ac-d7d1-4667-84ea-99b5640aba24', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -86,6 +86,20 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
               id: data.id
             }),
           });
+
+          if (webhookResponse.ok) {
+            const webhookData = await webhookResponse.json();
+            if (webhookData.JID) {
+              // Actualizar el grupo con el JID recibido
+              await supabase
+                .from('grupos')
+                .update({ 
+                  id_grupo: webhookData.JID,
+                  estado: 'Creado'
+                })
+                .eq('id', data.id);
+            }
+          }
         } catch (webhookError) {
           console.error('Error al llamar al webhook:', webhookError);
           // No mostramos error al usuario para no interrumpir el flujo
