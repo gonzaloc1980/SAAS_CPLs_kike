@@ -111,6 +111,7 @@ export type Database = {
           id: string
           id_grupo: string | null
           nombre: string
+          numeros_whatsapp: string[]
           updated_at: string
           user_id: string
         }
@@ -120,6 +121,7 @@ export type Database = {
           id?: string
           id_grupo?: string | null
           nombre: string
+          numeros_whatsapp?: string[]
           updated_at?: string
           user_id: string
         }
@@ -129,6 +131,7 @@ export type Database = {
           id?: string
           id_grupo?: string | null
           nombre?: string
+          numeros_whatsapp?: string[]
           updated_at?: string
           user_id?: string
         }

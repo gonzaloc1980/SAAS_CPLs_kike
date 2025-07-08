@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Grupo {
@@ -14,6 +14,7 @@ interface Grupo {
   nombre: string;
   id_grupo: string | null;
   estado: string;
+  numeros_whatsapp: string[];
   created_at: string;
 }
 
@@ -26,6 +27,7 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
   const [showForm, setShowForm] = useState(false);
   const [editingGrupo, setEditingGrupo] = useState<Grupo | null>(null);
   const [nombre, setNombre] = useState('');
+  const [numerosWhatsapp, setNumerosWhatsapp] = useState<string[]>(['']);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -47,9 +49,32 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
     }
   };
 
+  const addNumeroWhatsapp = () => {
+    setNumerosWhatsapp([...numerosWhatsapp, '']);
+  };
+
+  const removeNumeroWhatsapp = (index: number) => {
+    if (numerosWhatsapp.length > 1) {
+      setNumerosWhatsapp(numerosWhatsapp.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateNumeroWhatsapp = (index: number, value: string) => {
+    const newNumeros = [...numerosWhatsapp];
+    newNumeros[index] = value;
+    setNumerosWhatsapp(newNumeros);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nombre.trim()) return;
+    
+    // Validar números de WhatsApp
+    const numerosValidos = numerosWhatsapp.filter(num => num.trim() !== '');
+    if (numerosValidos.length === 0 && !editingGrupo) {
+      toast.error('Debes agregar al menos un número de WhatsApp');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -67,7 +92,8 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
           .insert({
             nombre,
             user_id: userId,
-            estado: 'Creando...'
+            estado: 'Creando...',
+            numeros_whatsapp: numerosValidos
           })
           .select()
           .single();
@@ -83,7 +109,8 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
             },
             body: JSON.stringify({
               user_id: userId,
-              id: data.id
+              id: data.id,
+              numeros_whatsapp: numerosValidos
             }),
           });
 
@@ -126,6 +153,7 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
   const handleEdit = (grupo: Grupo) => {
     setEditingGrupo(grupo);
     setNombre(grupo.nombre);
+    setNumerosWhatsapp(grupo.numeros_whatsapp?.length > 0 ? grupo.numeros_whatsapp : ['']);
     setShowForm(true);
   };
 
@@ -150,6 +178,7 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
     setShowForm(false);
     setEditingGrupo(null);
     setNombre('');
+    setNumerosWhatsapp(['']);
   };
 
   return (
@@ -185,6 +214,52 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
                   placeholder="Ingresa el nombre del grupo"
                 />
               </div>
+              
+              {!editingGrupo && (
+                <div className="space-y-2">
+                  <Label className="text-gray-200 flex items-center gap-2">
+                    <Phone className="h-4 w-4" />
+                    Números de WhatsApp
+                  </Label>
+                  <div className="space-y-2">
+                    {numerosWhatsapp.map((numero, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <Input
+                          value={numero}
+                          onChange={(e) => updateNumeroWhatsapp(index, e.target.value)}
+                          placeholder="Ej: +5212345678901"
+                          className="bg-gray-800 border-gray-700 text-white"
+                        />
+                        {numerosWhatsapp.length > 1 && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => removeNumeroWhatsapp(index)}
+                            className="border-red-700 text-red-400 hover:bg-red-900"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addNumeroWhatsapp}
+                      className="border-gray-700 text-gray-300 hover:bg-gray-800"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar número
+                    </Button>
+                  </div>
+                  <p className="text-sm text-gray-400">
+                    Se requiere al menos un número para formar el grupo
+                  </p>
+                </div>
+              )}
+              
               <div className="flex gap-2">
                 <Button
                   type="submit"
@@ -237,9 +312,20 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
                          {grupo.estado}
                        </Badge>
                      </div>
-                    <p className="text-sm text-gray-400">
-                      Creado: {new Date(grupo.created_at).toLocaleDateString()}
-                    </p>
+                     {grupo.numeros_whatsapp && grupo.numeros_whatsapp.length > 0 && (
+                       <div className="mb-2">
+                         <p className="text-sm text-gray-300 mb-1 flex items-center gap-1">
+                           <Phone className="h-3 w-3" />
+                           Números WhatsApp:
+                         </p>
+                         <p className="text-sm text-gray-400 break-all">
+                           {grupo.numeros_whatsapp.join(', ')}
+                         </p>
+                       </div>
+                     )}
+                     <p className="text-sm text-gray-400">
+                       Creado: {new Date(grupo.created_at).toLocaleDateString()}
+                     </p>
                   </div>
                   <div className="flex gap-2">
                     <Button
