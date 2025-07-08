@@ -227,7 +227,7 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
                         <Input
                           value={numero}
                           onChange={(e) => updateNumeroWhatsapp(index, e.target.value)}
-                          placeholder="Ej: +5212345678901"
+                          placeholder="Ej: 5212345678901"
                           className="bg-gray-800 border-gray-700 text-white"
                         />
                         {numerosWhatsapp.length > 1 && (
