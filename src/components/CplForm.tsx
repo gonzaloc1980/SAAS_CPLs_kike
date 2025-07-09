@@ -79,11 +79,43 @@ const CplForm = ({ userId, grupos, editingCpl, onClose, onSuccess }: CplFormProp
 
   const handleTipoCplChange = (tipo: string, checked: boolean) => {
     if (checked) {
-      // Solo permitir un tipo a la vez
-      setFormData(prev => ({
-        ...prev,
-        tipo_cpl: [tipo]
-      }));
+      // Solo permitir un tipo a la vez y limpiar campos de otros tipos
+      setFormData(prev => {
+        const newData = { ...prev, tipo_cpl: [tipo] };
+        
+        // Limpiar campos según el tipo seleccionado
+        switch (tipo) {
+          case 'texto':
+            // Mantener solo mensaje_x_dia, limpiar el resto
+            newData.youtube_url = '';
+            newData.texto_video = '';
+            newData.imagen_texto = '';
+            newData.audio_texto = '';
+            break;
+          case 'video':
+            // Mantener solo youtube_url y texto_video, limpiar el resto
+            newData.mensaje_x_dia = '';
+            newData.imagen_texto = '';
+            newData.audio_texto = '';
+            break;
+          case 'imagen':
+            // Mantener solo imagen_texto, limpiar el resto
+            newData.mensaje_x_dia = '';
+            newData.youtube_url = '';
+            newData.texto_video = '';
+            newData.audio_texto = '';
+            break;
+          case 'audio':
+            // Mantener solo audio_texto, limpiar el resto
+            newData.mensaje_x_dia = '';
+            newData.youtube_url = '';
+            newData.texto_video = '';
+            newData.imagen_texto = '';
+            break;
+        }
+        
+        return newData;
+      });
     } else {
       setFormData(prev => ({
         ...prev,
