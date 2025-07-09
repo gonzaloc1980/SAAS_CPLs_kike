@@ -79,14 +79,15 @@ const CplForm = ({ userId, grupos, editingCpl, onClose, onSuccess }: CplFormProp
 
   const handleTipoCplChange = (tipo: string, checked: boolean) => {
     if (checked) {
+      // Solo permitir un tipo a la vez
       setFormData(prev => ({
         ...prev,
-        tipo_cpl: [...prev.tipo_cpl, tipo]
+        tipo_cpl: [tipo]
       }));
     } else {
       setFormData(prev => ({
         ...prev,
-        tipo_cpl: prev.tipo_cpl.filter(t => t !== tipo)
+        tipo_cpl: []
       }));
     }
   };
