@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, Edit, Trash2, Calendar, Clock, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import CplForm from './CplForm';
@@ -85,8 +86,6 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar este CPL?')) return;
-
     try {
       const { error } = await supabase
         .from('cpls')
@@ -208,14 +207,39 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleDelete(cpl.id)}
-                      className="border-red-700 text-red-400 hover:bg-red-900"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-700 text-red-400 hover:bg-red-900"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-gray-900 border-gray-700">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-white flex items-center gap-2">
+                            <Trash2 className="h-5 w-5 text-red-400" />
+                            Confirmar eliminación
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="text-gray-300">
+                            ¿Estás seguro de que deseas eliminar este CPL? Esta acción no se puede deshacer.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-gray-800 border-gray-600 text-gray-300 hover:bg-gray-700">
+                            Cancelar
+                          </AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => handleDelete(cpl.id)}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                          >
+                            Eliminar
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               </CardContent>

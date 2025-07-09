@@ -58,10 +58,14 @@ const VincularManager = ({ userId, userEmail }: VincularManagerProps) => {
       if (error) throw error;
       
       toast.success('Vinculación completada exitosamente');
+      
+      // Refresh de la página después de completar la vinculación
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (error) {
       console.error('Error updating profile:', error);
       toast.error('Error al completar la vinculación');
-    } finally {
       setLoading(false);
     }
   };
