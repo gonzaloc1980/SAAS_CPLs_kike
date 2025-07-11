@@ -10,12 +10,20 @@ import { toast } from 'sonner';
 import GruposManager from '@/components/GruposManager';
 import CplsManager from '@/components/CplsManager';
 import VincularManager from '@/components/VincularManager';
+import OrganizationsManager from '@/components/OrganizationsManager';
+import OrganizationSelector from '@/components/OrganizationSelector';
 
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string>('user');
+  const [selectedOrganization, setSelectedOrganization] = useState<{
+    id: string | null;
+    name: string;
+    role: string;
+  }>({ id: null, name: '', role: 'user' });
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -26,6 +34,7 @@ const Dashboard = () => {
         
         if (session?.user) {
           fetchUserProfile(session.user.id);
+          fetchUserRole(session.user.id);
         }
       }
     );
@@ -37,6 +46,7 @@ const Dashboard = () => {
       
       if (session?.user) {
         fetchUserProfile(session.user.id);
+        fetchUserRole(session.user.id);
       }
     });
 
@@ -77,6 +87,63 @@ const Dashboard = () => {
     }
   };
 
+  const fetchUserRole = async (userId: string) => {
+    try {
+      // Verificar si es super admin
+      const { data: superAdminData, error: superAdminError } = await supabase
+        .rpc('is_super_admin', { _user_id: userId });
+
+      if (superAdminError) {
+        console.error('Error checking super admin:', superAdminError);
+        return;
+      }
+
+      if (superAdminData) {
+        setUserRole('super_admin');
+        return;
+      }
+
+      // Obtener organizaciones del usuario
+      const { data: orgsData, error: orgsError } = await supabase
+        .rpc('get_user_organizations', { _user_id: userId });
+
+      if (orgsError) {
+        console.error('Error fetching user organizations:', orgsError);
+        return;
+      }
+
+      if (orgsData && orgsData.length > 0) {
+        // Establecer la primera organización como seleccionada
+        const firstOrg = orgsData[0];
+        setSelectedOrganization({
+          id: firstOrg.organization_id,
+          name: firstOrg.organization_name,
+          role: firstOrg.user_role
+        });
+        setUserRole(firstOrg.user_role);
+      }
+    } catch (error) {
+      console.error('Error in fetchUserRole:', error);
+    }
+  };
+
+  const handleOrganizationChange = (orgId: string, orgName: string, role: string) => {
+    setSelectedOrganization({
+      id: orgId,
+      name: orgName,
+      role: role
+    });
+  };
+
+  const getTabsGridCols = () => {
+    if (userRole === 'super_admin') {
+      return selectedOrganization.id 
+        ? (userProfile?.vinculado === false ? 'grid-cols-4' : 'grid-cols-3')
+        : 'grid-cols-1';
+    }
+    return userProfile?.vinculado === false ? 'grid-cols-3' : 'grid-cols-2';
+  };
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     toast.success('Sesión cerrada exitosamente');
@@ -100,6 +167,13 @@ const Dashboard = () => {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-bold text-blue-400">CPL Manager</h1>
           <div className="flex items-center gap-4">
+            {userRole !== 'super_admin' && selectedOrganization.id && (
+              <OrganizationSelector
+                selectedOrgId={selectedOrganization.id}
+                onOrganizationChange={handleOrganizationChange}
+                userRole={userRole}
+              />
+            )}
             <span className="text-gray-400">{user.email}</span>
             <Button
               onClick={handleSignOut}
@@ -115,42 +189,70 @@ const Dashboard = () => {
       </header>
 
       <main className="max-w-7xl mx-auto p-4">
-        <Tabs defaultValue="cpls" className="w-full">
-          <TabsList className={`grid w-full ${userProfile?.vinculado === false ? 'grid-cols-3' : 'grid-cols-2'} bg-gray-900 border-gray-800`}>
-            <TabsTrigger 
-              value="cpls" 
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-            >
-              CPLs
-            </TabsTrigger>
-            <TabsTrigger 
-              value="grupos" 
-              className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-            >
-              Grupos
-            </TabsTrigger>
-            {userProfile?.vinculado === false && (
+        <Tabs defaultValue={userRole === 'super_admin' ? 'organizations' : 'cpls'} className="w-full">
+          <TabsList className={`grid w-full ${getTabsGridCols()} bg-gray-900 border-gray-800`}>
+            {userRole === 'super_admin' && (
               <TabsTrigger 
-                value="vincular" 
+                value="organizations" 
                 className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
               >
-                Vincular
+                Organizaciones
               </TabsTrigger>
+            )}
+            {selectedOrganization.id && (
+              <>
+                <TabsTrigger 
+                  value="cpls" 
+                  className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                >
+                  CPLs
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="grupos" 
+                  className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                >
+                  Grupos
+                </TabsTrigger>
+                {userProfile?.vinculado === false && (
+                  <TabsTrigger 
+                    value="vincular" 
+                    className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                  >
+                    Vincular
+                  </TabsTrigger>
+                )}
+              </>
             )}
           </TabsList>
           
-          <TabsContent value="cpls" className="mt-6">
-            <CplsManager userId={user.id} />
-          </TabsContent>
-          
-          <TabsContent value="grupos" className="mt-6">
-            <GruposManager userId={user.id} />
-          </TabsContent>
-          
-          {userProfile?.vinculado === false && (
-            <TabsContent value="vincular" className="mt-6">
-              <VincularManager userId={user.id} userEmail={user.email} />
+          {userRole === 'super_admin' && (
+            <TabsContent value="organizations" className="mt-6">
+              <OrganizationsManager userRole={userRole} />
             </TabsContent>
+          )}
+          
+          {selectedOrganization.id && (
+            <>
+              <TabsContent value="cpls" className="mt-6">
+                <CplsManager userId={user.id} />
+              </TabsContent>
+              
+              <TabsContent value="grupos" className="mt-6">
+                <GruposManager userId={user.id} />
+              </TabsContent>
+              
+              {userProfile?.vinculado === false && (
+                <TabsContent value="vincular" className="mt-6">
+                  <VincularManager userId={user.id} userEmail={user.email} />
+                </TabsContent>
+              )}
+            </>
+          )}
+          
+          {!selectedOrganization.id && userRole !== 'super_admin' && (
+            <div className="mt-6 text-center">
+              <p className="text-gray-400">No hay organización seleccionada</p>
+            </div>
           )}
         </Tabs>
       </main>

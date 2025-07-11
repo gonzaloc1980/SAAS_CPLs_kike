@@ -58,6 +58,7 @@ export type Database = {
           imagen_texto: string | null
           imagen_url: string | null
           mensaje_x_dia: string | null
+          organization_id: string | null
           texto_video: string | null
           tipo_cpl: string[]
           updated_at: string
@@ -77,6 +78,7 @@ export type Database = {
           imagen_texto?: string | null
           imagen_url?: string | null
           mensaje_x_dia?: string | null
+          organization_id?: string | null
           texto_video?: string | null
           tipo_cpl: string[]
           updated_at?: string
@@ -96,13 +98,22 @@ export type Database = {
           imagen_texto?: string | null
           imagen_url?: string | null
           mensaje_x_dia?: string | null
+          organization_id?: string | null
           texto_video?: string | null
           tipo_cpl?: string[]
           updated_at?: string
           user_id?: string
           youtube_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cpls_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       grupos: {
         Row: {
@@ -112,6 +123,7 @@ export type Database = {
           id_grupo: string | null
           nombre: string
           numeros_whatsapp: string[]
+          organization_id: string | null
           updated_at: string
           user_id: string
         }
@@ -122,6 +134,7 @@ export type Database = {
           id_grupo?: string | null
           nombre: string
           numeros_whatsapp?: string[]
+          organization_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -132,8 +145,47 @@ export type Database = {
           id_grupo?: string | null
           nombre?: string
           numeros_whatsapp?: string[]
+          organization_id?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grupos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+          whatsapp_api_key: string | null
+          whatsapp_phone_number: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+          whatsapp_api_key?: string | null
+          whatsapp_phone_number?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          whatsapp_api_key?: string | null
+          whatsapp_phone_number?: string | null
         }
         Relationships: []
       }
@@ -141,6 +193,7 @@ export type Database = {
         Row: {
           api_key: string | null
           created_at: string
+          default_organization_id: string | null
           id: string
           nombre: string | null
           phone: string | null
@@ -151,6 +204,7 @@ export type Database = {
         Insert: {
           api_key?: string | null
           created_at?: string
+          default_organization_id?: string | null
           id?: string
           nombre?: string | null
           phone?: string | null
@@ -161,6 +215,7 @@ export type Database = {
         Update: {
           api_key?: string | null
           created_at?: string
+          default_organization_id?: string | null
           id?: string
           nombre?: string | null
           phone?: string | null
@@ -168,17 +223,76 @@ export type Database = {
           user_id?: string
           vinculado?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_default_organization_id_fkey"
+            columns: ["default_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          organization_id: string | null
+          role: Database["public"]["Enums"]["user_role_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          role?: Database["public"]["Enums"]["user_role_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          organization_id?: string | null
+          role?: Database["public"]["Enums"]["user_role_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_organizations: {
+        Args: { _user_id: string }
+        Returns: {
+          organization_id: string
+          organization_name: string
+          user_role: Database["public"]["Enums"]["user_role_type"]
+        }[]
+      }
+      has_role_in_org: {
+        Args: {
+          _user_id: string
+          _organization_id: string
+          _role: Database["public"]["Enums"]["user_role_type"]
+        }
+        Returns: boolean
+      }
+      is_super_admin: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      user_role_type: "super_admin" | "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -305,6 +419,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      user_role_type: ["super_admin", "admin", "user"],
+    },
   },
 } as const

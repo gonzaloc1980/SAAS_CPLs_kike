@@ -223,6 +223,17 @@ const CplForm = ({ userId, grupos, editingCpl, onClose, onSuccess }: CplFormProp
         audio_url = await uploadFile(audioFile, 'audios');
       }
 
+      // Obtener la organización del usuario
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Usuario no autenticado');
+
+      const { data: orgsData } = await supabase
+        .rpc('get_user_organizations', { _user_id: userData.user.id });
+
+      if (!orgsData || orgsData.length === 0) {
+        throw new Error('No tienes organizaciones asignadas');
+      }
+
       const cplData = {
         fecha_inicio: formData.fecha_inicio.toLocaleDateString('en-CA'),
         fecha_termino: formData.fecha_termino.toLocaleDateString('en-CA'),
@@ -237,7 +248,8 @@ const CplForm = ({ userId, grupos, editingCpl, onClose, onSuccess }: CplFormProp
         audio_url: formData.tipo_cpl.includes('audio') ? audio_url : null,
         audio_texto: formData.tipo_cpl.includes('audio') ? formData.audio_texto || null : null,
         destinatario_persona_grupo: formData.destinatario_persona_grupo || null,
-        user_id: userId
+        user_id: userId,
+        organization_id: orgsData[0].organization_id
       };
 
       if (editingCpl) {
