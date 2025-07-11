@@ -143,9 +143,69 @@ const CplForm = ({ userId, grupos, editingCpl, onClose, onSuccess }: CplFormProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validaciones de campos generales obligatorios
+    if (!formData.destinatario_persona_grupo) {
+      toast.error('Selecciona un grupo destinatario');
+      return;
+    }
+    
+    if (!formData.dia_semana) {
+      toast.error('Selecciona un día de la semana');
+      return;
+    }
+    
+    if (!formData.hora) {
+      toast.error('Ingresa una hora');
+      return;
+    }
+    
     if (formData.tipo_cpl.length === 0) {
       toast.error('Selecciona al menos un tipo de CPL');
       return;
+    }
+
+    // Validaciones específicas por tipo de CPL
+    const tipoSeleccionado = formData.tipo_cpl[0];
+    
+    if (tipoSeleccionado === 'texto') {
+      if (!formData.mensaje_x_dia || formData.mensaje_x_dia.trim() === '') {
+        toast.error('El campo "Mensaje por Día" es obligatorio para CPL de texto');
+        return;
+      }
+    }
+    
+    if (tipoSeleccionado === 'video') {
+      if (!formData.youtube_url || formData.youtube_url.trim() === '') {
+        toast.error('El campo "URL de YouTube" es obligatorio para CPL de video');
+        return;
+      }
+      if (!formData.texto_video || formData.texto_video.trim() === '') {
+        toast.error('El campo "Texto del Video" es obligatorio para CPL de video');
+        return;
+      }
+    }
+    
+    if (tipoSeleccionado === 'imagen') {
+      if (!editingCpl && !imagenFile) {
+        toast.error('Debes seleccionar una imagen para CPL de imagen');
+        return;
+      }
+      if (!formData.imagen_texto || formData.imagen_texto.trim() === '') {
+        toast.error('El campo "Texto de la Imagen" es obligatorio para CPL de imagen');
+        return;
+      }
+    }
+    
+    if (tipoSeleccionado === 'audio') {
+      if (!editingCpl && !audioFile) {
+        toast.error('Debes seleccionar un audio para CPL de audio');
+        return;
+      }
+      if (!formData.audio_texto || formData.audio_texto.trim() === '') {
+        toast.error('El campo "Texto del Audio" es obligatorio para CPL de audio');
+        return;
+      }
     }
 
     setLoading(true);
