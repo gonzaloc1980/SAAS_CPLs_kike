@@ -8,6 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Edit, Trash2, Calendar, Clock, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import CplForm from './CplForm';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface Cpl {
   id: string;
@@ -39,22 +40,27 @@ interface CplsManagerProps {
 }
 
 const CplsManager = ({ userId }: CplsManagerProps) => {
+  const { selectedOrganization } = useOrganization();
   const [cpls, setCpls] = useState<Cpl[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingCpl, setEditingCpl] = useState<Cpl | null>(null);
 
   useEffect(() => {
-    fetchCpls();
-    fetchGrupos();
-  }, [userId]);
+    if (selectedOrganization) {
+      fetchCpls();
+      fetchGrupos();
+    }
+  }, [userId, selectedOrganization]);
 
   const fetchCpls = async () => {
+    if (!selectedOrganization) return;
+    
     try {
       const { data, error } = await supabase
         .from('cpls')
         .select('*')
-        .eq('user_id', userId)
+        .eq('organization_id', selectedOrganization.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -65,11 +71,13 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
   };
 
   const fetchGrupos = async () => {
+    if (!selectedOrganization) return;
+    
     try {
       const { data, error } = await supabase
         .from('grupos')
         .select('*')
-        .eq('user_id', userId)
+        .eq('organization_id', selectedOrganization.id)
         .eq('estado', 'Creado')
         .order('nombre');
 
@@ -120,13 +128,15 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-white">Gestión de CPLs</h2>
-        <Button
-          onClick={() => setShowForm(true)}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo CPL
-        </Button>
+        {selectedOrganization && (
+          <Button
+            onClick={() => setShowForm(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo CPL
+          </Button>
+        )}
       </div>
 
       {showForm && (
@@ -147,10 +157,16 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
       )}
 
       <div className="grid gap-4">
-        {cpls.length === 0 ? (
+        {!selectedOrganization ? (
           <Card className="bg-gray-900 border-gray-800">
             <CardContent className="text-center py-8">
-              <p className="text-gray-400">No tienes CPLs creados aún.</p>
+              <p className="text-gray-400">Selecciona una organización para ver los CPLs.</p>
+            </CardContent>
+          </Card>
+        ) : cpls.length === 0 ? (
+          <Card className="bg-gray-900 border-gray-800">
+            <CardContent className="text-center py-8">
+              <p className="text-gray-400">No hay CPLs creados en esta organización.</p>
             </CardContent>
           </Card>
         ) : (

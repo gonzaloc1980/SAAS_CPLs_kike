@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, Edit, Trash2, X, Phone } from 'lucide-react';
 import { toast } from 'sonner';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface Grupo {
   id: string;
@@ -24,6 +25,7 @@ interface GruposManagerProps {
 }
 
 const GruposManager = ({ userId }: GruposManagerProps) => {
+  const { selectedOrganization } = useOrganization();
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editingGrupo, setEditingGrupo] = useState<Grupo | null>(null);
@@ -32,15 +34,19 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchGrupos();
-  }, [userId]);
+    if (selectedOrganization) {
+      fetchGrupos();
+    }
+  }, [userId, selectedOrganization]);
 
   const fetchGrupos = async () => {
+    if (!selectedOrganization) return;
+    
     try {
       const { data, error } = await supabase
         .from('grupos')
         .select('*')
-        .eq('user_id', userId)
+        .eq('organization_id', selectedOrganization.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -93,6 +99,7 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
           .insert({
             nombre,
             user_id: userId,
+            organization_id: selectedOrganization?.id,
             estado: 'Creando...',
             numeros_whatsapp: numerosValidos
           })
@@ -184,13 +191,15 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-white">Gestión de Grupos</h2>
-        <Button
-          onClick={() => setShowForm(true)}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Grupo
-        </Button>
+        {selectedOrganization && (
+          <Button
+            onClick={() => setShowForm(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Grupo
+          </Button>
+        )}
       </div>
 
       {showForm && (
@@ -282,10 +291,16 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
       )}
 
       <div className="grid gap-4">
-        {grupos.length === 0 ? (
+        {!selectedOrganization ? (
           <Card className="bg-gray-900 border-gray-800">
             <CardContent className="text-center py-8">
-              <p className="text-gray-400">No tienes grupos creados aún.</p>
+              <p className="text-gray-400">Selecciona una organización para ver los grupos.</p>
+            </CardContent>
+          </Card>
+        ) : grupos.length === 0 ? (
+          <Card className="bg-gray-900 border-gray-800">
+            <CardContent className="text-center py-8">
+              <p className="text-gray-400">No hay grupos creados en esta organización.</p>
             </CardContent>
           </Card>
         ) : (

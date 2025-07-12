@@ -12,6 +12,8 @@ import CplsManager from '@/components/CplsManager';
 import VincularManager from '@/components/VincularManager';
 import OrganizationsManager from '@/components/OrganizationsManager';
 import OrganizationSelector from '@/components/OrganizationSelector';
+import UsersManager from '@/components/UsersManager';
+import { OrganizationProvider } from '@/contexts/OrganizationContext';
 
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -138,8 +140,11 @@ const Dashboard = () => {
   const getTabsGridCols = () => {
     if (userRole === 'super_admin') {
       return selectedOrganization.id 
-        ? (userProfile?.vinculado === false ? 'grid-cols-4' : 'grid-cols-3')
+        ? (userProfile?.vinculado === false ? 'grid-cols-5' : 'grid-cols-4')
         : 'grid-cols-1';
+    }
+    if (userRole === 'admin') {
+      return userProfile?.vinculado === false ? 'grid-cols-4' : 'grid-cols-3';
     }
     return userProfile?.vinculado === false ? 'grid-cols-3' : 'grid-cols-2';
   };
@@ -162,101 +167,117 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <header className="bg-gray-900 border-b border-gray-800 p-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-blue-400">CPL Manager</h1>
-          <div className="flex items-center gap-4">
-            {userRole !== 'super_admin' && selectedOrganization.id && (
-              <OrganizationSelector
-                selectedOrgId={selectedOrganization.id}
-                onOrganizationChange={handleOrganizationChange}
-                userRole={userRole}
-              />
-            )}
-            <span className="text-gray-400">{user.email}</span>
-            <Button
-              onClick={handleSignOut}
-              variant="outline"
-              size="sm"
-              className="border-gray-700 text-gray-300 hover:bg-gray-800"
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Cerrar Sesión
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto p-4">
-        <Tabs defaultValue={userRole === 'super_admin' ? 'organizations' : 'cpls'} className="w-full">
-          <TabsList className={`grid w-full ${getTabsGridCols()} bg-gray-900 border-gray-800`}>
-            {userRole === 'super_admin' && (
-              <TabsTrigger 
-                value="organizations" 
-                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+    <OrganizationProvider user={user}>
+      <div className="min-h-screen bg-gray-950 text-white">
+        <header className="bg-gray-900 border-b border-gray-800 p-4">
+          <div className="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-blue-400">CPL Manager</h1>
+            <div className="flex items-center gap-4">
+              {userRole !== 'super_admin' && selectedOrganization.id && (
+                <OrganizationSelector
+                  selectedOrgId={selectedOrganization.id}
+                  onOrganizationChange={handleOrganizationChange}
+                  userRole={userRole}
+                />
+              )}
+              <span className="text-gray-400">{user.email}</span>
+              <Button
+                onClick={handleSignOut}
+                variant="outline"
+                size="sm"
+                className="border-gray-700 text-gray-300 hover:bg-gray-800"
               >
-                Organizaciones
-              </TabsTrigger>
-            )}
-            {selectedOrganization.id && (
-              <>
+                <LogOut className="h-4 w-4 mr-2" />
+                Cerrar Sesión
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        <main className="max-w-7xl mx-auto p-4">
+          <Tabs defaultValue={userRole === 'super_admin' ? 'organizations' : 'cpls'} className="w-full">
+            <TabsList className={`grid w-full ${getTabsGridCols()} bg-gray-900 border-gray-800`}>
+              {userRole === 'super_admin' && (
                 <TabsTrigger 
-                  value="cpls" 
+                  value="organizations" 
                   className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
                 >
-                  CPLs
+                  Organizaciones
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="grupos" 
-                  className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-                >
-                  Grupos
-                </TabsTrigger>
-                {userProfile?.vinculado === false && (
+              )}
+              {selectedOrganization.id && (
+                <>
                   <TabsTrigger 
-                    value="vincular" 
+                    value="cpls" 
                     className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
                   >
-                    Vincular
+                    CPLs
                   </TabsTrigger>
+                  <TabsTrigger 
+                    value="grupos" 
+                    className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                  >
+                    Grupos
+                  </TabsTrigger>
+                  {(userRole === 'super_admin' || userRole === 'admin') && (
+                    <TabsTrigger 
+                      value="users" 
+                      className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                    >
+                      Usuarios
+                    </TabsTrigger>
+                  )}
+                  {userProfile?.vinculado === false && (
+                    <TabsTrigger 
+                      value="vincular" 
+                      className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                    >
+                      Vincular
+                    </TabsTrigger>
+                  )}
+                </>
+              )}
+            </TabsList>
+            
+            {userRole === 'super_admin' && (
+              <TabsContent value="organizations" className="mt-6">
+                <OrganizationsManager userRole={userRole} />
+              </TabsContent>
+            )}
+            
+            {selectedOrganization.id && (
+              <>
+                <TabsContent value="cpls" className="mt-6">
+                  <CplsManager userId={user.id} />
+                </TabsContent>
+                
+                <TabsContent value="grupos" className="mt-6">
+                  <GruposManager userId={user.id} />
+                </TabsContent>
+                
+                {(userRole === 'super_admin' || userRole === 'admin') && (
+                  <TabsContent value="users" className="mt-6">
+                    <UsersManager userRole={userRole} />
+                  </TabsContent>
+                )}
+                
+                {userProfile?.vinculado === false && (
+                  <TabsContent value="vincular" className="mt-6">
+                    <VincularManager userId={user.id} userEmail={user.email} />
+                  </TabsContent>
                 )}
               </>
             )}
-          </TabsList>
-          
-          {userRole === 'super_admin' && (
-            <TabsContent value="organizations" className="mt-6">
-              <OrganizationsManager userRole={userRole} />
-            </TabsContent>
-          )}
-          
-          {selectedOrganization.id && (
-            <>
-              <TabsContent value="cpls" className="mt-6">
-                <CplsManager userId={user.id} />
-              </TabsContent>
-              
-              <TabsContent value="grupos" className="mt-6">
-                <GruposManager userId={user.id} />
-              </TabsContent>
-              
-              {userProfile?.vinculado === false && (
-                <TabsContent value="vincular" className="mt-6">
-                  <VincularManager userId={user.id} userEmail={user.email} />
-                </TabsContent>
-              )}
-            </>
-          )}
-          
-          {!selectedOrganization.id && userRole !== 'super_admin' && (
-            <div className="mt-6 text-center">
-              <p className="text-gray-400">No hay organización seleccionada</p>
-            </div>
-          )}
-        </Tabs>
-      </main>
-    </div>
+            
+            {!selectedOrganization.id && userRole !== 'super_admin' && (
+              <div className="mt-6 text-center">
+                <p className="text-gray-400">No hay organización seleccionada</p>
+              </div>
+            )}
+          </Tabs>
+        </main>
+      </div>
+    </OrganizationProvider>
   );
 };
 
