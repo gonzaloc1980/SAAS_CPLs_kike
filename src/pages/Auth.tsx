@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Navigate, Link } from 'react-router-dom';
 import { ArrowLeft, LogIn } from 'lucide-react';
+import blasterLogo from '../assets/blaster_transparente.png';
 
 const Auth = () => {
   const [email, setEmail] = useState('');
@@ -72,15 +73,14 @@ const Auth = () => {
         </div>
 
         <Card className="w-full bg-gray-900 border-gray-800">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-white">
-              CPL Manager
-            </CardTitle>
-            <CardDescription className="text-gray-400">
-              Acceso exclusivo para administradores
-            </CardDescription>
+          <CardHeader className="text-center pb-1 md:pb-2">
+            <img 
+              src={blasterLogo}
+              alt="Blaster Logo" 
+              className="mx-auto mb-1 md:mb-2 h-24 md:h-32 w-auto object-contain"
+            />
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-1 md:pt-2">
             <form onSubmit={handleAuth} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-gray-200">Email</Label>
@@ -91,7 +91,7 @@ const Auth = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   className="bg-gray-800 border-gray-700 text-white"
-                  placeholder="admin@cplmanager.com"
+                  placeholder="tucorreo@gmail.com"
                 />
               </div>
               <div className="space-y-2">
@@ -121,13 +121,6 @@ const Auth = () => {
                 )}
               </Button>
             </form>
-            
-            <div className="mt-6 p-4 bg-gray-800 rounded-lg border border-gray-700">
-              <p className="text-sm text-gray-400 text-center">
-                <strong className="text-gray-300">Solo administradores:</strong><br />
-                El registro de nuevos usuarios es gestionado exclusivamente por el administrador del sistema.
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>

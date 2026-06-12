@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, Calendar, Clock, Users, Filter, X, Copy, Pause, Play } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, Clock, Users, Filter, X, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import CplForm from './CplForm';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -25,7 +25,6 @@ interface Cpl {
   audio_url: string | null;
   audio_texto: string | null;
   destinatario_persona_grupo: string | null;
-  estado: string;
   created_at: string;
 }
 
@@ -49,23 +48,6 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
   const [editingCpl, setEditingCpl] = useState<Cpl | null>(null);
   const [duplicatingCpl, setDuplicatingCpl] = useState<Cpl | null>(null);
   const [selectedGrupoFilter, setSelectedGrupoFilter] = useState<string>('todos');
-  const [estadoFilter, setEstadoFilter] = useState<string>('todos');
-  
-  // Ref para el formulario
-  const formRef = useRef<HTMLDivElement>(null);
-
-  // Función para hacer scroll hacia el formulario
-  const scrollToForm = () => {
-    setTimeout(() => {
-      if (formRef.current) {
-        formRef.current.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'start',
-          inline: 'nearest'
-        });
-      }
-    }, 100);
-  };
 
   // Función para obtener el número del día de la semana
   const getDayNumber = (dayName: string): number => {
@@ -81,29 +63,20 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
     return days[dayName as keyof typeof days] || 0;
   };
 
-  // Función para filtrar CPLs por grupo y estado
-  const filterCpls = (cplList: Cpl[], grupoFilter: string, estadoFilterValue: string): Cpl[] => {
-    let filtered = cplList;
-    
-    // Filtrar por grupo
-    if (grupoFilter !== 'todos') {
-      filtered = filtered.filter(cpl => cpl.destinatario_persona_grupo === grupoFilter);
+  // Función para filtrar CPLs por grupo
+  const filterCplsByGroup = (cplList: Cpl[], grupoFilter: string): Cpl[] => {
+    if (grupoFilter === 'todos') {
+      return cplList;
     }
-    
-    // Filtrar por estado
-    if (estadoFilterValue !== 'todos') {
-      filtered = filtered.filter(cpl => cpl.estado === estadoFilterValue);
-    }
-    
-    return filtered;
+    return cplList.filter(cpl => cpl.destinatario_persona_grupo === grupoFilter);
   };
 
-  // Efecto para actualizar CPLs filtrados cuando cambian los filtros o los CPLs
+  // Efecto para actualizar CPLs filtrados cuando cambia el filtro o los CPLs
   useEffect(() => {
-    const filtered = filterCpls(cpls, selectedGrupoFilter, estadoFilter);
+    const filtered = filterCplsByGroup(cpls, selectedGrupoFilter);
     const sorted = sortCplsByDayAndTime(filtered);
     setFilteredCpls(sorted);
-  }, [cpls, selectedGrupoFilter, estadoFilter]);
+  }, [cpls, selectedGrupoFilter]);
   
   const sortCplsByDayAndTime = (cplList: Cpl[]): Cpl[] => {
     return [...cplList].sort((a, b) => {
@@ -169,37 +142,18 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
     setEditingCpl(cpl);
     setDuplicatingCpl(null);
     setShowForm(true);
-    scrollToForm();
   };
 
   const handleDuplicate = (cpl: Cpl) => {
+    // Crear una copia del CPL sin el ID para que se cree uno nuevo
     const cplCopy = {
       ...cpl,
-      id: '',
-      created_at: ''
+      id: '', // Limpiamos el ID para que se genere uno nuevo
+      created_at: '' // Limpiamos la fecha de creación
     };
     setDuplicatingCpl(cplCopy);
     setEditingCpl(null);
     setShowForm(true);
-    scrollToForm();
-  };
-
-  const handleToggleEstado = async (cpl: Cpl) => {
-    const nuevoEstado = cpl.estado === 'activo' ? 'pausado' : 'activo';
-    
-    try {
-      const { error } = await supabase
-        .from('cpls')
-        .update({ estado: nuevoEstado })
-        .eq('id', cpl.id);
-
-      if (error) throw error;
-      
-      toast.success(`CPL ${nuevoEstado === 'activo' ? 'activado' : 'pausado'} exitosamente`);
-      fetchCpls();
-    } catch (error: any) {
-      toast.error(`Error al ${nuevoEstado === 'activo' ? 'activar' : 'pausar'} CPL: ` + error.message);
-    }
   };
 
   const handleDelete = async (id: string) => {
@@ -262,43 +216,16 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
     return grupo?.nombre || 'Grupo no encontrado';
   };
 
-  // Función para obtener estadísticas
-  const getEstadisticas = () => {
-    const total = cpls.length;
-    const activos = cpls.filter(cpl => cpl.estado === 'activo').length;
-    const pausados = cpls.filter(cpl => cpl.estado === 'pausado').length;
-    
-    return { total, activos, pausados };
-  };
-
-  const estadisticas = getEstadisticas();
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Gestión de CPLs</h2>
-          {selectedOrganization && (
-            <div className="flex gap-4 mt-2">
-              <span className="text-sm text-gray-300">
-                Total: <span className="font-semibold text-blue-400">{estadisticas.total}</span>
-              </span>
-              <span className="text-sm text-gray-300">
-                Activos: <span className="font-semibold text-green-400">{estadisticas.activos}</span>
-              </span>
-              <span className="text-sm text-gray-300">
-                Pausados: <span className="font-semibold text-orange-400">{estadisticas.pausados}</span>
-              </span>
-            </div>
-          )}
-        </div>
+        <h2 className="text-2xl font-bold text-white">Gestión de CPLs</h2>
         {selectedOrganization && (
           <Button
             onClick={() => {
               setEditingCpl(null);
               setDuplicatingCpl(null);
               setShowForm(true);
-              scrollToForm();
             }}
             className="bg-blue-600 hover:bg-blue-700"
           >
@@ -308,116 +235,75 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
         )}
       </div>
 
-      {/* Filtros */}
-      {selectedOrganization && (
+      {/* Filtro por grupo */}
+      {selectedOrganization && grupos.length > 0 && (
         <Card className="bg-gray-900 border-gray-800">
           <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-gray-400" />
-                <span className="text-sm font-medium text-gray-300">Filtros:</span>
+                <span className="text-sm font-medium text-gray-300">Filtrar por grupo:</span>
               </div>
-              
-              {/* Filtro por grupo */}
-              {grupos.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-400">Grupo:</span>
-                  <Select value={selectedGrupoFilter} onValueChange={setSelectedGrupoFilter}>
-                    <SelectTrigger className="bg-gray-800 border-gray-700 text-white w-48">
-                      <SelectValue placeholder="Seleccionar grupo" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-gray-800 border-gray-700">
-                      <SelectItem value="todos" className="text-white hover:bg-gray-700">
-                        Todos los grupos
-                      </SelectItem>
-                      {grupos.map((grupo) => (
-                        <SelectItem 
-                          key={grupo.id} 
-                          value={grupo.id_grupo || ''}
-                          className="text-white hover:bg-gray-700"
-                        >
-                          {grupo.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Filtro por estado */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400">Estado:</span>
-                <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white w-40">
-                    <SelectValue placeholder="Todos" />
+              <div className="flex-1 max-w-xs">
+                <Select value={selectedGrupoFilter} onValueChange={setSelectedGrupoFilter}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700 text-white">
+                    <SelectValue placeholder="Seleccionar grupo" />
                   </SelectTrigger>
                   <SelectContent className="bg-gray-800 border-gray-700">
                     <SelectItem value="todos" className="text-white hover:bg-gray-700">
-                      Todos
+                      Todos los grupos
                     </SelectItem>
-                    <SelectItem value="activo" className="text-white hover:bg-gray-700">
-                      Activos
-                    </SelectItem>
-                    <SelectItem value="pausado" className="text-white hover:bg-gray-700">
-                      Pausados
-                    </SelectItem>
+                    {grupos.map((grupo) => (
+                      <SelectItem 
+                        key={grupo.id} 
+                        value={grupo.id_grupo || ''}
+                        className="text-white hover:bg-gray-700"
+                      >
+                        {grupo.nombre}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-
-              {/* Botón limpiar filtros */}
-              {(selectedGrupoFilter !== 'todos' || estadoFilter !== 'todos') && (
+              {selectedGrupoFilter !== 'todos' && (
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
-                    setSelectedGrupoFilter('todos');
-                    setEstadoFilter('todos');
-                  }}
+                  onClick={() => setSelectedGrupoFilter('todos')}
                   className="border-gray-600 text-gray-300 hover:bg-gray-700"
                 >
                   <X className="h-4 w-4 mr-1" />
-                  Limpiar filtros
+                  Limpiar
                 </Button>
               )}
             </div>
-
-            {/* Información de filtros activos */}
-            {(selectedGrupoFilter !== 'todos' || estadoFilter !== 'todos') && (
-              <div className="mt-3 text-sm text-blue-400 flex flex-wrap gap-2">
-                {selectedGrupoFilter !== 'todos' && (
-                  <span>Grupo: <strong>{getSelectedGrupoName()}</strong></span>
-                )}
-                {estadoFilter !== 'todos' && (
-                  <span>Estado: <strong>{estadoFilter === 'activo' ? 'Activos' : 'Pausados'}</strong></span>
-                )}
+            {selectedGrupoFilter !== 'todos' && (
+              <div className="mt-2 text-sm text-blue-400">
+                Mostrando CPLs para: <strong>{getSelectedGrupoName()}</strong>
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Formulario con ref para scroll */}
       {showForm && (
-        <div ref={formRef}>
-          <CplForm
-            userId={userId}
-            grupos={grupos}
-            editingCpl={editingCpl}
-            duplicatingCpl={duplicatingCpl}
-            onClose={() => {
-              setShowForm(false);
-              setEditingCpl(null);
-              setDuplicatingCpl(null);
-            }}
-            onSuccess={() => {
-              fetchCpls();
-              setShowForm(false);
-              setEditingCpl(null);
-              setDuplicatingCpl(null);
-            }}
-          />
-        </div>
+        <CplForm
+          userId={userId}
+          grupos={grupos}
+          editingCpl={editingCpl}
+          duplicatingCpl={duplicatingCpl}
+          onClose={() => {
+            setShowForm(false);
+            setEditingCpl(null);
+            setDuplicatingCpl(null);
+          }}
+          onSuccess={() => {
+            fetchCpls();
+            setShowForm(false);
+            setEditingCpl(null);
+            setDuplicatingCpl(null);
+          }}
+        />
       )}
 
       <div className="space-y-6">
@@ -431,9 +317,9 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
           <Card className="bg-gray-900 border-gray-800">
             <CardContent className="text-center py-8">
               <p className="text-gray-400">
-                {cpls.length === 0 
+                {selectedGrupoFilter === 'todos' 
                   ? 'No hay CPLs creados en esta organización.' 
-                  : 'No se encontraron CPLs con los filtros aplicados.'
+                  : `No hay CPLs para el grupo "${getSelectedGrupoName()}".`
                 }
               </p>
             </CardContent>
@@ -449,14 +335,7 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
                 </h3>
                 <div className="grid gap-4">
                   {groupedCpls[day].map((cpl) => (
-                    <Card 
-                      key={cpl.id} 
-                      className={`border-gray-800 ${
-                        cpl.estado === 'pausado' 
-                          ? 'bg-gray-800 opacity-75' 
-                          : 'bg-gray-900'
-                      }`}
-                    >
+                    <Card key={cpl.id} className="bg-gray-900 border-gray-800">
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start mb-4">
                           <div className="flex-1">
@@ -470,16 +349,6 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
                                   {tipo}
                                 </Badge>
                               ))}
-                              <Badge
-                                variant={cpl.estado === 'activo' ? 'default' : 'secondary'}
-                                className={
-                                  cpl.estado === 'activo' 
-                                    ? 'bg-[#1D4ED8] text-white' 
-                                    : 'bg-orange-600 text-white'
-                                }
-                              >
-                                {cpl.estado === 'activo' ? 'Activo' : 'Pausado'}
-                              </Badge>
                             </div>
                             
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
@@ -510,25 +379,6 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
                           </div>
                           
                           <div className="flex gap-2 ml-4">
-                            {/* Botón pausar/activar */}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleToggleEstado(cpl)}
-                              className={
-                                cpl.estado === 'activo'
-                                  ? "border-orange-700 text-orange-400 hover:bg-orange-900"
-                                  : "border-green-700 text-green-400 hover:bg-green-900"
-                              }
-                              title={cpl.estado === 'activo' ? 'Pausar CPL' : 'Activar CPL'}
-                            >
-                              {cpl.estado === 'activo' ? (
-                                <Pause className="h-4 w-4" />
-                              ) : (
-                                <Play className="h-4 w-4" />
-                              )}
-                            </Button>
-                            
                             <Button
                               size="sm"
                               variant="outline"
@@ -538,7 +388,6 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
                             >
                               <Copy className="h-4 w-4" />
                             </Button>
-                            
                             <Button
                               size="sm"
                               variant="outline"
@@ -548,7 +397,6 @@ const CplsManager = ({ userId }: CplsManagerProps) => {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button

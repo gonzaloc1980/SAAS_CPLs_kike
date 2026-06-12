@@ -115,12 +115,101 @@ export type Database = {
           },
         ]
       }
+      cpls_lanzamientos: {
+        Row: {
+          admin_cpl_pais: string | null
+          audio_texto: string | null
+          audio_url: string | null
+          created_at: string
+          destinatario_persona_grupo: string | null
+          dia_mes: number | null
+          estado: string
+          fecha_inicio: string | null
+          fecha_lanzamiento: string | null
+          fecha_termino: string | null
+          hora: string
+          hora_colombia: string | null
+          id: string
+          imagen_texto: string | null
+          imagen_url: string | null
+          mensaje_x_dia: string | null
+          organization_id: string | null
+          texto_video: string | null
+          tipo_cpl: string[]
+          tipo_lanzamiento: string
+          updated_at: string
+          user_id: string
+          youtube_url: string | null
+        }
+        Insert: {
+          admin_cpl_pais?: string | null
+          audio_texto?: string | null
+          audio_url?: string | null
+          created_at?: string
+          destinatario_persona_grupo?: string | null
+          dia_mes?: number | null
+          estado?: string
+          fecha_inicio?: string | null
+          fecha_lanzamiento?: string | null
+          fecha_termino?: string | null
+          hora: string
+          hora_colombia?: string | null
+          id?: string
+          imagen_texto?: string | null
+          imagen_url?: string | null
+          mensaje_x_dia?: string | null
+          organization_id?: string | null
+          texto_video?: string | null
+          tipo_cpl: string[]
+          tipo_lanzamiento: string
+          updated_at?: string
+          user_id: string
+          youtube_url?: string | null
+        }
+        Update: {
+          admin_cpl_pais?: string | null
+          audio_texto?: string | null
+          audio_url?: string | null
+          created_at?: string
+          destinatario_persona_grupo?: string | null
+          dia_mes?: number | null
+          estado?: string
+          fecha_inicio?: string | null
+          fecha_lanzamiento?: string | null
+          fecha_termino?: string | null
+          hora?: string
+          hora_colombia?: string | null
+          id?: string
+          imagen_texto?: string | null
+          imagen_url?: string | null
+          mensaje_x_dia?: string | null
+          organization_id?: string | null
+          texto_video?: string | null
+          tipo_cpl?: string[]
+          tipo_lanzamiento?: string
+          updated_at?: string
+          user_id?: string
+          youtube_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cpls_lanzamientos_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       grupos: {
         Row: {
           created_at: string
+          enlace_invitacion: string | null
           estado: string
           id: string
           id_grupo: string | null
+          identificador_meta: string | null
+          mensaje_bienvenida: string | null
           nombre: string
           numeros_whatsapp: string[]
           organization_id: string | null
@@ -129,9 +218,12 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          enlace_invitacion?: string | null
           estado?: string
           id?: string
           id_grupo?: string | null
+          identificador_meta?: string | null
+          mensaje_bienvenida?: string | null
           nombre: string
           numeros_whatsapp?: string[]
           organization_id?: string | null
@@ -140,9 +232,12 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          enlace_invitacion?: string | null
           estado?: string
           id?: string
           id_grupo?: string | null
+          identificador_meta?: string | null
+          mensaje_bienvenida?: string | null
           nombre?: string
           numeros_whatsapp?: string[]
           organization_id?: string | null
@@ -164,6 +259,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          pais: string | null
           status: string
           updated_at: string
           whatsapp_api_key: string | null
@@ -173,6 +269,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          pais?: string | null
           status?: string
           updated_at?: string
           whatsapp_api_key?: string | null
@@ -182,6 +279,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          pais?: string | null
           status?: string
           updated_at?: string
           whatsapp_api_key?: string | null
@@ -197,6 +295,7 @@ export type Database = {
           id: string
           nombre: string | null
           phone: string | null
+          pais: string | null
           updated_at: string
           user_id: string
           vinculado: boolean
@@ -208,6 +307,7 @@ export type Database = {
           id?: string
           nombre?: string | null
           phone?: string | null
+          pais?: string | null
           updated_at?: string
           user_id: string
           vinculado?: boolean
@@ -219,6 +319,7 @@ export type Database = {
           id?: string
           nombre?: string | null
           phone?: string | null
+          pais?: string | null
           updated_at?: string
           user_id?: string
           vinculado?: boolean

@@ -71,7 +71,7 @@ const ContactForm = () => {
           Solicita una Asesoría
         </CardTitle>
         <CardDescription className="text-gray-400">
-          Déjanos tus datos y nos pondremos en contacto contigo para brindarte más información sobre CPL Manager
+          Déjanos tus datos y nos pondremos en contacto contigo para brindarte más información
         </CardDescription>
       </CardHeader>
       <CardContent>

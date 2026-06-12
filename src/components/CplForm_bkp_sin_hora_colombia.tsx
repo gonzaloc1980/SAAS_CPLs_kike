@@ -64,88 +64,6 @@ const ESTADOS_CPL = [
   { id: 'pausado', label: 'Pausado' }
 ];
 
-// Función mejorada para calcular la hora en Colombia con conversión real de zonas horarias
-const calcularHoraColombia = (horaLocal: string, paisAdmin: string): string => {
-  if (!horaLocal || !paisAdmin || paisAdmin === 'Colombia') {
-    return horaLocal;
-  }
-
-  const zonasHorarias: { [key: string]: string } = {
-    'Puerto Rico': 'America/Puerto_Rico',
-    'Estados Unidos': 'America/New_York',
-    'México': 'America/Mexico_City',
-    'Argentina': 'America/Argentina/Buenos_Aires',
-    'Chile': 'America/Santiago',
-    'Perú': 'America/Lima',
-    'Ecuador': 'America/Guayaquil',
-    'Venezuela': 'America/Caracas',
-    'Panamá': 'America/Panama',
-    'Costa Rica': 'America/Costa_Rica',
-    'Guatemala': 'America/Guatemala',
-    'República Dominicana': 'America/Santo_Domingo',
-    'España': 'Europe/Madrid',
-  };
-
-  const zonaOrigen = zonasHorarias[paisAdmin];
-  if (!zonaOrigen) {
-    console.warn(`Zona horaria no definida para: ${paisAdmin}`);
-    return horaLocal;
-  }
-
-  try {
-    // Crear una fecha de hoy con la hora específica
-    const hoy = new Date();
-    const [horas, minutos] = horaLocal.split(':').map(Number);
-    
-    // Crear fecha en la zona horaria del país de origen
-    const fechaEnOrigen = new Date();
-    fechaEnOrigen.setHours(horas, minutos, 0, 0);
-    
-    // Obtener la misma hora pero interpretada en la zona horaria de Colombia
-    const fechaEnColombia = new Date(fechaEnOrigen.toLocaleString("en-US", { timeZone: zonaOrigen }));
-    const fechaColombiaConvertida = new Date(fechaEnColombia.toLocaleString("en-US", { timeZone: "America/Bogota" }));
-    
-    // Calcular diferencia horaria actual entre las zonas
-    const offsetOrigen = obtenerOffsetMinutos(zonaOrigen, new Date());
-    const offsetColombia = obtenerOffsetMinutos("America/Bogota", new Date());
-    
-    const diferenciaMinutos = offsetColombia - offsetOrigen;
-    
-    // Aplicar la diferencia a la hora original
-    const totalMinutos = horas * 60 + minutos + diferenciaMinutos;
-    
-    // Normalizar para mantener en rango 0-1439 minutos (0-23:59)
-    let minutosNormalizados = totalMinutos;
-    while (minutosNormalizados < 0) {
-      minutosNormalizados += 1440; // 24 horas = 1440 minutos
-    }
-    while (minutosNormalizados >= 1440) {
-      minutosNormalizados -= 1440;
-    }
-    
-    const horasFinal = Math.floor(minutosNormalizados / 60);
-    const minutosFinal = minutosNormalizados % 60;
-    
-    return `${horasFinal.toString().padStart(2, '0')}:${minutosFinal.toString().padStart(2, '0')}`;
-    
-  } catch (error) {
-    console.error('Error al convertir hora a Colombia:', error);
-    return horaLocal;
-  }
-};
-
-// Función auxiliar para obtener el offset en minutos de una zona horaria
-const obtenerOffsetMinutos = (zonaHoraria: string, fecha: Date): number => {
-  try {
-    const utc1 = new Date(fecha.toLocaleString('en-US', { timeZone: 'UTC' }));
-    const utc2 = new Date(fecha.toLocaleString('en-US', { timeZone: zonaHoraria }));
-    return (utc2.getTime() - utc1.getTime()) / 60000;
-  } catch (error) {
-    console.error('Error obteniendo offset:', error);
-    return 0;
-  }
-};
-
 const CplForm = ({ userId, grupos, editingCpl, duplicatingCpl, onClose, onSuccess }: CplFormProps) => {
   // Determinar qué CPL usar como base (edición o duplicación)
   const baseCpl = editingCpl || duplicatingCpl;
@@ -169,68 +87,6 @@ const CplForm = ({ userId, grupos, editingCpl, duplicatingCpl, onClose, onSucces
   const [loading, setLoading] = useState(false);
   const [imagenFile, setImagenFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [adminCplPais, setAdminCplPais] = useState<string>('Colombia');
-
-  // Obtener el país del administrador desde la tabla organizations
-  useEffect(() => {
-    const obtenerPaisAdmin = async () => {
-      try {
-        const { data: userData } = await supabase.auth.getUser();
-        if (!userData.user) return;
-
-        // Primero obtener las organizaciones del usuario
-        const { data: orgsData, error: orgsError } = await supabase
-          .rpc('get_user_organizations', { _user_id: userData.user.id });
-
-        if (orgsError) {
-          console.error('Error obteniendo organizaciones:', orgsError);
-          setAdminCplPais('Colombia');
-          return;
-        }
-
-        if (!orgsData || orgsData.length === 0) {
-          console.warn('No se encontraron organizaciones para el usuario');
-          setAdminCplPais('Colombia');
-          return;
-        }
-
-        // Obtener el país de la primera organización
-        const { data: orgData, error: orgError } = await supabase
-          .from('organizations')
-          .select('pais')
-          .eq('id', orgsData[0].organization_id)
-          .single();
-
-        console.log("Imprimiendo orgData: ", JSON.stringify(orgData));
-        
-        if (orgError) {
-          console.error('Error obteniendo país de la organización:', orgError);
-          // Fallback: intentar obtener de profiles
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('pais')
-            .eq('id', userData.user.id)
-            .single();
-
-          if (!profileError && profileData?.pais) {
-            setAdminCplPais(profileData.pais);
-          } else {
-            setAdminCplPais('Colombia');
-          }
-          return;
-        }
-        
-        // Establecer el país desde la organización
-        setAdminCplPais(orgData?.pais || 'Colombia');
-
-      } catch (error) {
-        console.error('Error en obtenerPaisAdmin:', error);
-        setAdminCplPais('Colombia');
-      }
-    };
-
-    obtenerPaisAdmin();
-  }, []);
 
   const handleTipoCplChange = (tipo: string, checked: boolean) => {
     if (checked) {
@@ -389,16 +245,11 @@ const CplForm = ({ userId, grupos, editingCpl, duplicatingCpl, onClose, onSucces
         throw new Error('No tienes organizaciones asignadas');
       }
 
-      // Calcular la hora de Colombia basada en el país del administrador
-      const horaColombia = calcularHoraColombia(formData.hora, adminCplPais);
-
       const cplData = {
         fecha_inicio: formData.fecha_inicio.toLocaleDateString('en-CA'),
         fecha_termino: formData.fecha_termino.toLocaleDateString('en-CA'),
         dia_semana: formData.dia_semana,
         hora: formData.hora,
-        hora_colombia: horaColombia, // Nuevo campo calculado
-        admin_cpl_pais: adminCplPais, // Guardar el país del administrador
         tipo_cpl: formData.tipo_cpl,
         mensaje_x_dia: formData.mensaje_x_dia || null,
         youtube_url: formData.tipo_cpl.includes('video') ? formData.youtube_url || null : null,

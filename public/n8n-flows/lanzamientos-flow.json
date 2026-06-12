@@ -1,0 +1,1442 @@
+{
+  "name": "PROD: Lanzamientos_principal_enviar_contenido",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-3600, -112],
+      "id": "a1111111-1111-1111-1111-111111111101",
+      "name": "Schedule-lanzamientos"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configuramos la zona horaria de Bogotá\nconst opcionesDia = {\n  timeZone: 'America/Bogota',\n  weekday: 'long'\n};\nconst hoyEnBogota = new Date().toLocaleDateString('es-ES', opcionesDia);\nconst diaCapitalizado = hoyEnBogota.charAt(0).toUpperCase() + hoyEnBogota.slice(1);\nconst opcionesHora = {\n  timeZone: 'America/Bogota',\n  hour: '2-digit',\n  minute: '2-digit',\n  second: '2-digit',\n  hour12: false\n};\nconst ahora = new Date();\nconst hace1min = new Date(ahora.getTime() - 1 * 60 * 1000);\nconst en1min = new Date(ahora.getTime() + 1 * 60 * 1000);\nconst horaBogota = ahora.toLocaleTimeString('es-ES', opcionesHora);\nconst horaMenos30 = hace1min.toLocaleTimeString('es-ES', opcionesHora);\nconst horaMas120 = en1min.toLocaleTimeString('es-ES', opcionesHora);\n\n// Calcular día del mes y fecha ISO en zona Bogotá\nconst fechaEnBogota = new Date(ahora.toLocaleString(\"en-US\", { timeZone: 'America/Bogota' }));\nconst diaDelMes = fechaEnBogota.getDate();\nconst anio = fechaEnBogota.getFullYear();\nconst mesNum = String(fechaEnBogota.getMonth() + 1).padStart(2, '0');\nconst diaNum = String(fechaEnBogota.getDate()).padStart(2, '0');\nconst fechaHoyISO = `${anio}-${mesNum}-${diaNum}`;\n\nreturn [\n  {\n    json: {\n      dia: diaCapitalizado,\n      hora: horaBogota,\n      horaMenos30: horaMenos30,\n      horaMas120: horaMas120,\n      diaDelMes: diaDelMes,\n      fechaHoyISO: fechaHoyISO,\n      zonaHoraria: 'America/Bogota'\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-3344, -128],
+      "id": "a1111111-1111-1111-1111-111111111102",
+      "name": "Code_fecha_hora"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "cpls_lanzamientos",
+        "limit": 100000,
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "estado",
+              "condition": "eq",
+              "keyValue": "activo"
+            },
+            {
+              "keyName": "hora_colombia",
+              "condition": "gte",
+              "keyValue": "={{ $json.horaMenos30 }}"
+            },
+            {
+              "keyName": "hora_colombia",
+              "condition": "lte",
+              "keyValue": "={{ $json.horaMas120 }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-3120, -112],
+      "id": "a1111111-1111-1111-1111-111111111103",
+      "name": "get_CPLs_lanzamientos",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "HNlQmQh3HeZvzlPc",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 8
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-2544, -96],
+      "id": "a1111111-1111-1111-1111-111111111104",
+      "name": "Wait4",
+      "webhookId": "f1a2b3c4-d5e6-7890-abcd-ef1234567890"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Obtener todos los datos del nodo anterior\nconst inputData = $input.all();\n\n// Mapeo de países a zonas horarias\nconst paisAZonaHoraria = {\n  'Colombia': 'America/Bogota',\n  'Argentina': 'America/Argentina/Buenos_Aires',\n  'México': 'America/Mexico_City',\n  'Chile': 'America/Santiago',\n  'Perú': 'America/Lima',\n  'Ecuador': 'America/Guayaquil',\n  'Venezuela': 'America/Caracas',\n  'Bolivia': 'America/La_Paz',\n  'Uruguay': 'America/Montevideo',\n  'Paraguay': 'America/Asuncion',\n  'Costa Rica': 'America/Costa_Rica',\n  'Panamá': 'America/Panama',\n  'Guatemala': 'America/Guatemala',\n  'Honduras': 'America/Tegucigalpa',\n  'El Salvador': 'America/El_Salvador',\n  'Nicaragua': 'America/Managua',\n  'Puerto Rico': 'America/Puerto_Rico',\n  'Estados Unidos': 'America/Los_Angeles'\n};\n\nconst offsetVsColombia = {\n  'America/Bogota': 0,\n  'America/Lima': 0,\n  'America/Guayaquil': 0,\n  'America/Panama': 0,\n  'America/El_Salvador': 0,\n  'America/Costa_Rica': -1,\n  'America/Mexico_City': -1,\n  'America/Guatemala': -1,\n  'America/Tegucigalpa': -1,\n  'America/Managua': -1,\n  'America/Los_Angeles': -2,\n  'America/Caracas': 0.5,\n  'America/La_Paz': 1,\n  'America/Santiago': 1,\n  'America/Asuncion': 2,\n  'America/Puerto_Rico': 1,\n  'America/Montevideo': 2,\n  'America/Argentina/Buenos_Aires': 2\n};\n\nfunction convertirHoraColombiaAZona(horaColombiaStr, zonaDestino) {\n  if (!horaColombiaStr) return null;\n  try {\n    const [h, m, s] = horaColombiaStr.split(':').map(Number);\n    const offset = offsetVsColombia[zonaDestino] !== undefined ? offsetVsColombia[zonaDestino] : 0;\n    const offsetHoras = Math.floor(offset);\n    const offsetMinutos = Math.round((offset - offsetHoras) * 60);\n    let horaFinal = h + offsetHoras;\n    let minutosFinal = m + offsetMinutos;\n    if (minutosFinal >= 60) { horaFinal += 1; minutosFinal -= 60; }\n    else if (minutosFinal < 0) { horaFinal -= 1; minutosFinal += 60; }\n    if (horaFinal >= 24) horaFinal -= 24;\n    if (horaFinal < 0) horaFinal += 24;\n    return `${String(horaFinal).padStart(2, '0')}:${String(minutosFinal).padStart(2, '0')}:${String(s).padStart(2, '0')}`;\n  } catch (error) {\n    console.log(`Error convirtiendo hora: ${horaColombiaStr}`, error);\n    return null;\n  }\n}\n\nfunction obtenerZonaHoraria(pais) {\n  return paisAZonaHoraria[pais] || 'America/Bogota';\n}\n\nfunction obtenerFechaHoraPorZona(zonaHoraria) {\n  const today = new Date();\n  const fechaZona = new Date(today.toLocaleString(\"en-US\", { timeZone: zonaHoraria }));\n  return fechaZona;\n}\n\nfunction parsearHoraSolo(horaStr, fechaReferencia) {\n  if (!horaStr) return null;\n  try {\n    const [horas, minutos, segundos] = horaStr.split(':');\n    const fechaHoy = new Date(fechaReferencia);\n    fechaHoy.setHours(parseInt(horas));\n    fechaHoy.setMinutes(parseInt(minutos));\n    fechaHoy.setSeconds(parseInt(segundos || 0));\n    fechaHoy.setMilliseconds(0);\n    return fechaHoy;\n  } catch (error) {\n    console.log(`Error parseando hora: ${horaStr}`, error);\n    return null;\n  }\n}\n\nfunction estaEnRango4Minutos(fechaObjetivo, fechaActual) {\n  if (!fechaObjetivo) return false;\n  const diferenciaMilisegundos = fechaObjetivo.getTime() - fechaActual.getTime();\n  const diferenciaMinutos = diferenciaMilisegundos / (1000 * 60);\n  console.log(`Comparando: ${fechaObjetivo.toLocaleString()} vs ${fechaActual.toLocaleString()}`);\n  console.log(`Diferencia en minutos: ${diferenciaMinutos}`);\n  return diferenciaMinutos >= -2 && diferenciaMinutos <= 2;\n}\n\nlet countOriginal = inputData.length;\nlet countFiltradosFechaDia = 0;\nlet countFiltradosHora = 0;\n\nconst datosConDebug = inputData.map(item => {\n  const datos = item.json || item;\n  const zonaHoraria = obtenerZonaHoraria(datos.admin_cpl_pais);\n  const fechaHoraPais = obtenerFechaHoraPorZona(zonaHoraria);\n\n  console.log(`País: ${datos.admin_cpl_pais}, Zona: ${zonaHoraria}`);\n  console.log(`Hora actual ${datos.admin_cpl_pais}: ${fechaHoraPais.toLocaleString()}`);\n  console.log(`Procesando item:`, datos);\n\n  // Fecha de hoy en formato ISO usando la zona del país del destinatario\n  const anio = fechaHoraPais.getFullYear();\n  const mes = String(fechaHoraPais.getMonth() + 1).padStart(2, '0');\n  const dia = String(fechaHoraPais.getDate()).padStart(2, '0');\n  const fechaHoyString = `${anio}-${mes}-${dia}`;\n\n  // Validar según tipo de lanzamiento\n  let dentroDelRango = true;\n  let diaValido = false;\n\n  if (datos.tipo_lanzamiento === 'recurrente') {\n    // Para recurrente: verificar rango de fechas Y que el día del mes coincide\n    dentroDelRango = !datos.fecha_inicio || !datos.fecha_termino ||\n      (fechaHoyString >= datos.fecha_inicio && fechaHoyString <= datos.fecha_termino);\n    diaValido = datos.dia_mes === fechaHoraPais.getDate();\n  } else if (datos.tipo_lanzamiento === 'fecha_unica') {\n    // Para fecha única: verificar que la fecha exacta coincide con hoy\n    diaValido = datos.fecha_lanzamiento === fechaHoyString;\n    dentroDelRango = true;\n  }\n\n  console.log(`Tipo lanzamiento: ${datos.tipo_lanzamiento}`);\n  console.log(`dia_mes: ${datos.dia_mes}, diaHoy: ${fechaHoraPais.getDate()}`);\n  console.log(`fecha_lanzamiento: ${datos.fecha_lanzamiento}, fechaHoy: ${fechaHoyString}`);\n  console.log(`diaValido: ${diaValido}, dentroDelRango: ${dentroDelRango}`);\n\n  const pasoFecha = dentroDelRango;\n  const pasoDia = diaValido;\n  const pasoAmbos = pasoFecha && pasoDia;\n\n  return {\n    ...item,\n    json: datos,\n    fechaHoraPais: fechaHoraPais,\n    zonaHoraria: zonaHoraria,\n    debug: {\n      pasoFecha,\n      pasoDia,\n      mensaje: pasoAmbos ? 'Paso ambos filtros' : [\n        !pasoFecha ? 'No está dentro del rango de fechas' : '',\n        !pasoDia ? `No coincide el día de lanzamiento` : ''\n      ].filter(Boolean).join(', ')\n    }\n  };\n});\n\nconst datosFiltradosPorFechaYDia = datosConDebug.filter(i => i.debug.pasoFecha && i.debug.pasoDia);\ncountFiltradosFechaDia = datosFiltradosPorFechaYDia.length;\nconsole.log(`Elementos filtrados por fecha y día: ${countFiltradosFechaDia}`);\n\nconst datosConDebugFinal = datosFiltradosPorFechaYDia.map(item => {\n  const datos = item.json;\n  const horaColombiaOriginal = datos.hora_colombia || datos.hora;\n  const horaEnZonaLocal = convertirHoraColombiaAZona(horaColombiaOriginal, item.zonaHoraria);\n\n  console.log(`País: ${datos.admin_cpl_pais}, Zona: ${item.zonaHoraria}`);\n  console.log(`hora_colombia: ${horaColombiaOriginal} → hora local convertida: ${horaEnZonaLocal}`);\n\n  const horaItem = parsearHoraSolo(horaEnZonaLocal, item.fechaHoraPais);\n  const pasoHora = estaEnRango4Minutos(horaItem, item.fechaHoraPais);\n\n  const debugHora = {\n    horaColombiaOriginal,\n    horaConvertidaZonaLocal: horaEnZonaLocal,\n    horaParseada: horaItem ? horaItem.toLocaleString() : null,\n    horaActual: item.fechaHoraPais.toLocaleString(),\n    zonaHoraria: item.zonaHoraria,\n    pais: datos.admin_cpl_pais,\n    pasoHora,\n    mensaje: pasoHora\n      ? 'Está dentro del rango de 2 minutos antes y 2 minutos después'\n      : horaItem\n        ? 'Fuera del rango de 4 minutos'\n        : 'No se pudo parsear la hora'\n  };\n\n  console.log(`Item ${datos.id} (${datos.admin_cpl_pais}): ${horaColombiaOriginal} → ${horaEnZonaLocal} -> ${debugHora.mensaje}`);\n\n  return {\n    ...item,\n    debug: {\n      ...item.debug,\n      ...debugHora\n    }\n  };\n});\n\nconst datosRango4Min = datosConDebugFinal.filter(i => i.debug.pasoHora);\ncountFiltradosHora = datosRango4Min.length;\nconsole.log(`Elementos en rango de 4 minutos: ${countFiltradosHora}`);\n\nif (datosRango4Min.length === 0) {\n  console.log('No hay lanzamientos que cumplan los criterios de filtrado');\n  return {\n    estado: \"SinDatos\",\n    cantidadOriginal: countOriginal,\n    cantidadFiltradosPorDiaYFecha: countFiltradosFechaDia,\n    cantidadFiltradosPorHora: countFiltradosHora,\n    mensaje: 'No se encontraron lanzamientos que coincidan con los criterios',\n    debugResumen: {\n      elementos: datosConDebugFinal.map(i => ({\n        json: {\n          id: i.json.id,\n          hora: i.json.hora,\n          tipo_lanzamiento: i.json.tipo_lanzamiento,\n          dia_mes: i.json.dia_mes,\n          fecha_lanzamiento: i.json.fecha_lanzamiento,\n          admin_cpl_pais: i.json.admin_cpl_pais\n        },\n        debug: i.debug\n      }))\n    }\n  };\n}\n\nconst resultados = datosRango4Min.map(item => {\n  const datos = item.json;\n\n  function getVideoId(url) {\n    if (!url) return { id: null, type: null };\n    const youtubeRegex = /(?:youtube\\.com\\/watch\\?v=|youtu\\.be\\/)([^&\\n?#]+)/;\n    const youtubeMatch = url.match(youtubeRegex);\n    if (youtubeMatch) return { id: youtubeMatch[1], type: 'youtube' };\n    const driveRegex = /\\/file\\/d\\/([a-zA-Z0-9_-]+)/;\n    const driveMatch = url.match(driveRegex);\n    if (driveMatch) return { id: driveMatch[1], type: 'drive' };\n    return { id: null, type: null };\n  }\n\n  function getVideoThumbnails(videoInfo) {\n    if (!videoInfo.id) return null;\n    if (videoInfo.type === 'youtube') {\n      return {\n        default: `https://img.youtube.com/vi/${videoInfo.id}/default.jpg`,\n        medium: `https://img.youtube.com/vi/${videoInfo.id}/mqdefault.jpg`,\n        high: `https://img.youtube.com/vi/${videoInfo.id}/hqdefault.jpg`,\n        standard: `https://img.youtube.com/vi/${videoInfo.id}/sddefault.jpg`,\n        maxres: `https://img.youtube.com/vi/${videoInfo.id}/maxresdefault.jpg`\n      };\n    }\n    if (videoInfo.type === 'drive') {\n      return {\n        preview: `https://drive.google.com/thumbnail?id=${videoInfo.id}`,\n        direct: `https://drive.google.com/uc?id=${videoInfo.id}`,\n        view: `https://drive.google.com/file/d/${videoInfo.id}/view`\n      };\n    }\n    return null;\n  }\n\n  function procesarVariables(texto, datosItem) {\n    if (!texto) return texto;\n    let textoProcessado = texto;\n    if (datosItem.link && textoProcessado.includes('${link}')) {\n      textoProcessado = textoProcessado.replace(/\\$\\{link\\}/g, datosItem.link);\n    }\n    if (datosItem.youtube_url && textoProcessado.includes('${youtubeUrl}')) {\n      textoProcessado = textoProcessado.replace(/\\$\\{youtubeUrl\\}/g, datosItem.youtube_url);\n    }\n    return textoProcessado;\n  }\n\n  function validarYProcesarImagen(imagenUrl) {\n    if (!imagenUrl || imagenUrl.trim() === '') {\n      return { tieneImagen: false, imagenUrl: null, esGoogleDrive: false, esUrlValida: false };\n    }\n    const urlLimpia = imagenUrl.trim();\n    const esGoogleDrive = urlLimpia.includes('drive.google.com') || urlLimpia.includes('drive.usercontent.google.com');\n    const esUrlValida = /^https?:\\/\\/.+/.test(urlLimpia);\n    return { tieneImagen: true, imagenUrl: urlLimpia, esGoogleDrive, esUrlValida };\n  }\n\n  const videoId = getVideoId(datos.youtube_url);\n  const youtubeThumbnail = getVideoThumbnails(videoId);\n  const mensajeProcesado = procesarVariables(datos.mensaje_x_dia, datos);\n  const textoProcesado = procesarVariables(datos.texto_video, datos);\n  const imagenProcesada = validarYProcesarImagen(datos.imagen_url);\n  const imagenTextoProcesado = procesarVariables(datos.imagen_texto, datos);\n\n  const numeroDestinatario = [];\n  if (datos.destinatario_persona_grupo && datos.destinatario_persona_grupo.trim() !== '') {\n    numeroDestinatario.push(datos.destinatario_persona_grupo.trim());\n  }\n\n  const tipoDestinatario = numeroDestinatario.length === 0 ? 'sin_destinatario' : 'grupo';\n\n  let tipoContenido = 'solo_texto';\n  if (imagenProcesada.tieneImagen && datos.youtube_url) {\n    tipoContenido = 'imagen_y_video';\n  } else if (imagenProcesada.tieneImagen) {\n    tipoContenido = 'imagen';\n  } else if (datos.youtube_url) {\n    tipoContenido = 'video';\n  }\n\n  const fechaHoraPaisItem = item.fechaHoraPais;\n  const zonaHorariaItem = item.zonaHoraria;\n\n  return {\n    json: {\n      fechaActualPais: fechaHoraPaisItem.toISOString(),\n      horaConfiguracion: datos.hora_colombia || datos.hora,\n      zonaHoraria: zonaHorariaItem,\n      pais: datos.admin_cpl_pais,\n      tipo_lanzamiento: datos.tipo_lanzamiento,\n      dia_mes: datos.dia_mes,\n      fecha_lanzamiento: datos.fecha_lanzamiento,\n      id: datos.id,\n      youtubeUrl: datos.youtube_url,\n      videoId: videoId,\n      youtubeThumbnail: youtubeThumbnail,\n      mensajePorDia: mensajeProcesado,\n      textThumbnail: textoProcesado,\n      imagen: imagenProcesada.imagenUrl,\n      imagenTexto: imagenTextoProcesado,\n      tieneImagen: imagenProcesada.tieneImagen,\n      esImagenGoogleDrive: imagenProcesada.esGoogleDrive,\n      esImagenUrlValida: imagenProcesada.esUrlValida,\n      audioUrl: datos.audio_url,\n      audioTexto: datos.audio_texto,\n      tieneAudio: !!(datos.audio_url),\n      tipoCpl: datos.tipo_cpl,\n      destinatarioGrupo: datos.destinatario_persona_grupo,\n      numeroDestinatario: numeroDestinatario,\n      destinatarioPrincipal: numeroDestinatario.length > 0 ? numeroDestinatario[0] : null,\n      tipoDestinatario: tipoDestinatario,\n      cantidadDestinatarios: numeroDestinatario.length,\n      tipoContenido: tipoContenido,\n      tieneContenido: !!(mensajeProcesado || datos.youtube_url || imagenProcesada.tieneImagen || datos.audio_url),\n      tieneDestinatario: numeroDestinatario.length > 0,\n      datosOriginales: datos\n    },\n    debug: item.debug\n  };\n});\n\nreturn {\n  estado: \"ConDatos\",\n  datos: resultados,\n  metadatos: {\n    cantidadOriginal: countOriginal,\n    cantidadFiltradosPorDiaYFecha: countFiltradosFechaDia,\n    cantidadFiltradosPorHora: countFiltradosHora,\n    debugResumen: {\n      elementos: datosConDebugFinal.map(i => ({\n        json: {\n          id: i.json.id,\n          hora: i.json.hora,\n          tipo_lanzamiento: i.json.tipo_lanzamiento,\n          dia_mes: i.json.dia_mes,\n          fecha_lanzamiento: i.json.fecha_lanzamiento,\n          admin_cpl_pais: i.json.admin_cpl_pais,\n          zona_horaria: i.zonaHoraria\n        },\n        debug: i.debug\n      }))\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-2176, -96],
+      "id": "a1111111-1111-1111-1111-111111111105",
+      "name": "Filtrar_y_procesar_lanzamientos"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d2859937-43f3-4d8e-916e-1ce61fba94bc",
+              "leftValue": "={{ $json.estado }}",
+              "rightValue": "ConDatos",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-1840, -96],
+      "id": "a1111111-1111-1111-1111-111111111106",
+      "name": "If"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [-1600, 352],
+      "id": "a1111111-1111-1111-1111-111111111107",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Código para nodo Code en n8n\n// Filtra el array de datos donde tipoCpl contenga \"texto\"\n\nconst inputData = $input.all();\nlet filteredResults = [];\n\nfor (const item of inputData) {\n  const data = item.json;\n  if (data.estado === \"ConDatos\" && Array.isArray(data.datos)) {\n    const filteredDatos = data.datos.filter(dato => {\n      if (dato.json && Array.isArray(dato.json.tipoCpl)) {\n        return dato.json.tipoCpl.includes(\"texto\");\n      }\n      return false;\n    });\n    for (const dato of filteredDatos) {\n      filteredResults.push({ json: dato.json });\n    }\n  }\n}\n\nif (filteredResults.length === 0) {\n  filteredResults = [{ json: {} }];\n}\n\nreturn filteredResults;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-880, -560],
+      "id": "a1111111-1111-1111-1111-111111111108",
+      "name": "Code3"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a255e821-c9a7-4c15-bbb3-104c2f4c3719",
+              "leftValue": "={{ JSON.stringify($json) }}",
+              "rightValue": "{}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-688, -560],
+      "id": "a1111111-1111-1111-1111-111111111109",
+      "name": "If1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [-480, -784],
+      "id": "a1111111-1111-1111-1111-111111111110",
+      "name": "No Operation, do nothing1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-384, -576],
+      "id": "a1111111-1111-1111-1111-111111111111",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "chatId": "6725168507",
+        "text": "=Lanzamiento de texto enviado correctamente de la instancia {{ $('get_organizationID2').item.json.name }}",
+        "additionalFields": {
+          "appendAttribution": true
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-144, -784],
+      "id": "a1111111-1111-1111-1111-111111111112",
+      "name": "Telegram2",
+      "webhookId": "f9a87374-a55e-43a2-b36f-3b2ae545bf26",
+      "credentials": {
+        "telegramApi": {
+          "id": "0Pcasf0d2ZtPLwwG",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [80, -784],
+      "id": "a1111111-1111-1111-1111-111111111113",
+      "name": "No Operation, do nothing2"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "organizations",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.datosOriginales.organization_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-144, -576],
+      "id": "a1111111-1111-1111-1111-111111111114",
+      "name": "get_organizationID2",
+      "credentials": {
+        "supabaseApi": {
+          "id": "HNlQmQh3HeZvzlPc",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "={{ $json.whatsapp_api_key }}",
+        "remoteJid": "={{ $('Code3').item.json.destinatarioGrupo }}",
+        "messageText": "={{ $('Code3').item.json.datosOriginales.mensaje_x_dia }}",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [64, -592],
+      "id": "a1111111-1111-1111-1111-111111111115",
+      "name": "Evolution API",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 5,
+      "credentials": {
+        "evolutionApi": {
+          "id": "rI9hlBpfz0MKhsHe",
+          "name": "Evolution account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [720, -464],
+      "id": "a1111111-1111-1111-1111-111111111116",
+      "name": "Wait2",
+      "webhookId": "d2df35d9-9c95-4fcb-9d22-4d4aed0db5db"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filtra y procesa URLs de video (Google Drive, OneDrive, YouTube)\n\nfunction detectVideoUrlType(url) {\n  if (!url || typeof url !== 'string') return 'unknown';\n  if (/drive\\.google\\.com/.test(url)) return 'drive';\n  if (/1drv\\.ms/.test(url) || /onedrive\\.live\\.com/.test(url) || /sharepoint\\.com/.test(url)) return 'onedrive';\n  if (/youtube\\.com|youtu\\.be/.test(url)) return 'youtube';\n  return 'unknown';\n}\n\nfunction extractDriveFileId(url) {\n  if (!url || typeof url !== 'string') return null;\n  const match1 = url.match(/\\/file\\/d\\/([a-zA-Z0-9_-]+)/);\n  if (match1) return match1[1];\n  const match2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);\n  if (match2) return match2[1];\n  return null;\n}\n\nfunction convertOneDriveUrl(url) {\n  if (!url || typeof url !== 'string') return url;\n  if (url.includes('download=1')) return url;\n  return url.includes('?') ? url + '&download=1' : url + '?download=1';\n}\n\nfunction processVideoUrl(url) {\n  const type = detectVideoUrlType(url);\n  let processedUrl = url;\n  let videoId = { id: null, type: null };\n  let youtubeThumbnail = { preview: null, direct: null, view: null };\n\n  if (type === 'drive') {\n    const fileId = extractDriveFileId(url);\n    processedUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;\n    videoId = { id: fileId, type: 'drive' };\n    youtubeThumbnail = {\n      preview: `https://drive.google.com/thumbnail?id=${fileId}`,\n      direct: `https://drive.google.com/uc?id=${fileId}`,\n      view: `https://drive.google.com/file/d/${fileId}/view`\n    };\n  } else if (type === 'onedrive') {\n    const directUrl = convertOneDriveUrl(url);\n    processedUrl = directUrl;\n    videoId = { id: url, type: 'onedrive' };\n    youtubeThumbnail = { preview: null, direct: directUrl, view: url };\n  } else if (type === 'youtube') {\n    const ytMatch = url.match(/(?:youtube\\.com\\/watch\\?v=|youtu\\.be\\/)([a-zA-Z0-9_-]+)/);\n    const ytId = ytMatch ? ytMatch[1] : null;\n    processedUrl = url;\n    videoId = { id: ytId, type: 'youtube' };\n    youtubeThumbnail = {\n      preview: ytId ? `https://img.youtube.com/vi/${ytId}/hqdefault.jpg` : null,\n      direct: url,\n      view: url\n    };\n  }\n\n  return { processedUrl, videoId, youtubeThumbnail };\n}\n\nconst inputData = $input.all();\nlet filteredResults = [];\n\nfor (const item of inputData) {\n  const data = item.json;\n  if (data.estado === \"ConDatos\" && Array.isArray(data.datos)) {\n    const filteredDatos = data.datos.filter(dato => {\n      if (dato.json && Array.isArray(dato.json.tipoCpl)) {\n        return dato.json.tipoCpl.includes(\"video\");\n      }\n      return false;\n    });\n    for (const dato of filteredDatos) {\n      const datoModificado = { ...dato.json };\n      if (datoModificado.youtubeUrl) {\n        const { processedUrl, videoId, youtubeThumbnail } = processVideoUrl(datoModificado.youtubeUrl);\n        datoModificado.youtubeUrl = processedUrl;\n        datoModificado.videoId = videoId;\n        datoModificado.youtubeThumbnail = youtubeThumbnail;\n      }\n      filteredResults.push({ json: datoModificado });\n    }\n  }\n}\n\nif (filteredResults.length === 0) {\n  filteredResults = [{ json: {} }];\n}\n\nreturn filteredResults;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-720, -96],
+      "id": "a1111111-1111-1111-1111-111111111117",
+      "name": "Code5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a255e821-c9a7-4c15-bbb3-104c2f4c3719",
+              "leftValue": "={{ JSON.stringify($json) }}",
+              "rightValue": "{}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-544, -96],
+      "id": "a1111111-1111-1111-1111-111111111118",
+      "name": "If2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [-320, -240],
+      "id": "a1111111-1111-1111-1111-111111111119",
+      "name": "No Operation, do nothing3"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-304, -80],
+      "id": "a1111111-1111-1111-1111-111111111120",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "chatId": "6725168507",
+        "text": "=Lanzamiento de video enviado correctamente de la instancia {{ $('get_organizationID1').item.json.name }}",
+        "additionalFields": {
+          "appendAttribution": true
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-80, -224],
+      "id": "a1111111-1111-1111-1111-111111111121",
+      "name": "Telegram1",
+      "webhookId": "f9a87374-a55e-43a2-b36f-3b2ae545bf26",
+      "credentials": {
+        "telegramApi": {
+          "id": "0Pcasf0d2ZtPLwwG",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [80, -224],
+      "id": "a1111111-1111-1111-1111-111111111122",
+      "name": "No Operation, do nothing4"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "organizations",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.datosOriginales.organization_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-80, -48],
+      "id": "a1111111-1111-1111-1111-111111111123",
+      "name": "get_organizationID1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "HNlQmQh3HeZvzlPc",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "64a9ffc2-ac28-4565-9327-c29e57fe0ffa",
+              "leftValue": "={{ $('Loop Over Items1').item.json.videoId.type }}",
+              "rightValue": "drive",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "17708f6d-0002-4924-8386-c9c7400751b9",
+              "leftValue": "={{ $('Loop Over Items1').item.json.videoId.type }}",
+              "rightValue": "onedrive",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [112, -64],
+      "id": "a1111111-1111-1111-1111-111111111124",
+      "name": "If7"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [304, -208],
+      "id": "a1111111-1111-1111-1111-111111111125",
+      "name": "Wait5",
+      "webhookId": "778b2d35-974b-45ce-ad10-38522388493d"
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "operation": "send-video",
+        "instanceName": "={{ $json.whatsapp_api_key }}",
+        "remoteJid": "={{ $('Code5').item.json.destinatarioGrupo }}",
+        "media": "={{ $('Code5').item.json.youtubeUrl }}",
+        "caption": "={{ $('Code5').item.json.textThumbnail }}",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [512, -256],
+      "id": "a1111111-1111-1111-1111-111111111126",
+      "name": "Evolution API1",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 5,
+      "credentials": {
+        "evolutionApi": {
+          "id": "rI9hlBpfz0MKhsHe",
+          "name": "Evolution account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 6
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1056, 16],
+      "id": "a1111111-1111-1111-1111-111111111127",
+      "name": "Wait",
+      "webhookId": "d2df35d9-9c95-4fcb-9d22-4d4aed0db5db"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [288, -32],
+      "id": "a1111111-1111-1111-1111-111111111128",
+      "name": "No Operation, do nothing13"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filtra el array de datos donde tipoCpl contenga \"imagen\"\n\nconst inputData = $input.all();\nlet filteredResults = [];\n\nfor (const item of inputData) {\n  const data = item.json;\n  if (data.estado === \"ConDatos\" && Array.isArray(data.datos)) {\n    const filteredDatos = data.datos.filter(dato => {\n      if (dato.json && Array.isArray(dato.json.tipoCpl)) {\n        return dato.json.tipoCpl.includes(\"imagen\");\n      }\n      return false;\n    });\n    for (const dato of filteredDatos) {\n      filteredResults.push({ json: dato.json });\n    }\n  }\n}\n\nif (filteredResults.length === 0) {\n  filteredResults = [{ json: {} }];\n}\n\nreturn filteredResults;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-656, 448],
+      "id": "a1111111-1111-1111-1111-111111111129",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a255e821-c9a7-4c15-bbb3-104c2f4c3719",
+              "leftValue": "={{ JSON.stringify($json) }}",
+              "rightValue": "{}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-480, 448],
+      "id": "a1111111-1111-1111-1111-111111111130",
+      "name": "If3"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [-320, 288],
+      "id": "a1111111-1111-1111-1111-111111111131",
+      "name": "No Operation, do nothing7"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-288, 464],
+      "id": "a1111111-1111-1111-1111-111111111132",
+      "name": "Loop Over Items2"
+    },
+    {
+      "parameters": {
+        "chatId": "6725168507",
+        "text": "=Lanzamiento de imagen enviado correctamente de la instancia {{ $('get_organizationID3').item.json.name }}",
+        "additionalFields": {
+          "appendAttribution": true
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-64, 272],
+      "id": "a1111111-1111-1111-1111-111111111133",
+      "name": "Telegram",
+      "webhookId": "f9a87374-a55e-43a2-b36f-3b2ae545bf26",
+      "credentials": {
+        "telegramApi": {
+          "id": "0Pcasf0d2ZtPLwwG",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [144, 272],
+      "id": "a1111111-1111-1111-1111-111111111134",
+      "name": "No Operation, do nothing5"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "organizations",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.datosOriginales.organization_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [-48, 448],
+      "id": "a1111111-1111-1111-1111-111111111135",
+      "name": "get_organizationID3",
+      "credentials": {
+        "supabaseApi": {
+          "id": "HNlQmQh3HeZvzlPc",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "operation": "send-image",
+        "instanceName": "={{ $json.whatsapp_api_key }}",
+        "remoteJid": "={{ $('Code1').item.json.destinatarioGrupo }}",
+        "media": "={{ $('Code1').item.json.imagen }}",
+        "caption": "={{ $('Code1').item.json.imagenTexto }}",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [144, 448],
+      "id": "a1111111-1111-1111-1111-111111111136",
+      "name": "Evolution API2",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 5,
+      "credentials": {
+        "evolutionApi": {
+          "id": "rI9hlBpfz0MKhsHe",
+          "name": "Evolution account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [944, 544],
+      "id": "a1111111-1111-1111-1111-111111111137",
+      "name": "Wait1",
+      "webhookId": "d2df35d9-9c95-4fcb-9d22-4d4aed0db5db"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filtra el array de datos donde tipoCpl contenga \"audio\"\n\nconst inputData = $input.all();\nlet filteredResults = [];\n\nfor (const item of inputData) {\n  const data = item.json;\n  if (data.estado === \"ConDatos\" && Array.isArray(data.datos)) {\n    const filteredDatos = data.datos.filter(dato => {\n      if (dato.json && Array.isArray(dato.json.tipoCpl)) {\n        return dato.json.tipoCpl.includes(\"audio\");\n      }\n      return false;\n    });\n    for (const dato of filteredDatos) {\n      filteredResults.push({ json: dato.json });\n    }\n  }\n}\n\nif (filteredResults.length === 0) {\n  filteredResults = [{ json: {} }];\n}\n\nreturn filteredResults;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-640, 944],
+      "id": "a1111111-1111-1111-1111-111111111138",
+      "name": "Code2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "a255e821-c9a7-4c15-bbb3-104c2f4c3719",
+              "leftValue": "={{ JSON.stringify($json) }}",
+              "rightValue": "{}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-480, 944],
+      "id": "a1111111-1111-1111-1111-111111111139",
+      "name": "If4"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [-288, 800],
+      "id": "a1111111-1111-1111-1111-111111111140",
+      "name": "No Operation, do nothing8"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-240, 1008],
+      "id": "a1111111-1111-1111-1111-111111111141",
+      "name": "Loop Over Items3"
+    },
+    {
+      "parameters": {
+        "chatId": "6725168507",
+        "text": "=Lanzamiento de Audio enviado correctamente de la instancia {{ $('get_organizationID4').item.json.name }}",
+        "additionalFields": {
+          "appendAttribution": true
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-64, 832],
+      "id": "a1111111-1111-1111-1111-111111111142",
+      "name": "Telegram3",
+      "webhookId": "f9a87374-a55e-43a2-b36f-3b2ae545bf26",
+      "executeOnce": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "0Pcasf0d2ZtPLwwG",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [96, 784],
+      "id": "a1111111-1111-1111-1111-111111111143",
+      "name": "No Operation, do nothing6"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "organizations",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $json.datosOriginales.organization_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [0, 1008],
+      "id": "a1111111-1111-1111-1111-111111111144",
+      "name": "get_organizationID4",
+      "credentials": {
+        "supabaseApi": {
+          "id": "HNlQmQh3HeZvzlPc",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "operation": "send-audio",
+        "instanceName": "={{ $json.whatsapp_api_key }}",
+        "remoteJid": "={{ $('Code2').item.json.destinatarioGrupo }}",
+        "media": "={{ $('Loop Over Items3').item.json.datosOriginales.audio_url }}",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [464, 800],
+      "id": "a1111111-1111-1111-1111-111111111145",
+      "name": "Evolution API3",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 5,
+      "credentials": {
+        "evolutionApi": {
+          "id": "rI9hlBpfz0MKhsHe",
+          "name": "Evolution account 2"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "={{ $json.whatsapp_api_key }}",
+        "remoteJid": "={{ $('Code2').item.json.destinatarioGrupo }}",
+        "messageText": "={{ $('Code2').item.json.audioTexto }}",
+        "options_message": {}
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [448, 1104],
+      "id": "a1111111-1111-1111-1111-111111111146",
+      "name": "Evolution API4",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 5,
+      "credentials": {
+        "evolutionApi": {
+          "id": "rI9hlBpfz0MKhsHe",
+          "name": "Evolution account 2"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [1200, 1248],
+      "id": "a1111111-1111-1111-1111-111111111147",
+      "name": "Wait3",
+      "webhookId": "d2df35d9-9c95-4fcb-9d22-4d4aed0db5db"
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [608, 912],
+      "id": "a1111111-1111-1111-1111-111111111148",
+      "name": "Wait6",
+      "webhookId": "d2df35d9-9c95-4fcb-9d22-4d4aed0db5db"
+    },
+    {
+      "parameters": {
+        "amount": 60
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [672, 1184],
+      "id": "a1111111-1111-1111-1111-111111111149",
+      "name": "Wait8",
+      "webhookId": "d2df35d9-9c95-4fcb-9d22-4d4aed0db5db"
+    },
+    {
+      "parameters": {
+        "content": "## LANZAMIENTO TEXTO\n",
+        "height": 576,
+        "width": 1820
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-944, -848],
+      "typeVersion": 1,
+      "id": "a1111111-1111-1111-1111-111111111150",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## LANZAMIENTO VIDEO",
+        "height": 468,
+        "width": 1988,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-768, -256],
+      "typeVersion": 1,
+      "id": "a1111111-1111-1111-1111-111111111151",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## LANZAMIENTO IMAGEN",
+        "height": 492,
+        "width": 1788,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-688, 240],
+      "typeVersion": 1,
+      "id": "a1111111-1111-1111-1111-111111111152",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## LANZAMIENTO AUDIO",
+        "height": 692,
+        "width": 2044,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [-688, 752],
+      "typeVersion": 1,
+      "id": "a1111111-1111-1111-1111-111111111153",
+      "name": "Sticky Note5"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule-lanzamientos": {
+      "main": [
+        [
+          {
+            "node": "Code_fecha_hora",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code_fecha_hora": {
+      "main": [
+        [
+          {
+            "node": "get_CPLs_lanzamientos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_CPLs_lanzamientos": {
+      "main": [
+        [
+          {
+            "node": "Wait4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait4": {
+      "main": [
+        [
+          {
+            "node": "Filtrar_y_procesar_lanzamientos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar_y_procesar_lanzamientos": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code3": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Telegram2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get_organizationID2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram2": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_organizationID2": {
+      "main": [
+        [
+          {
+            "node": "Evolution API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution API": {
+      "main": [
+        [
+          {
+            "node": "Wait2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Wait2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code5": {
+      "main": [
+        [
+          {
+            "node": "If2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If2": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Telegram1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get_organizationID1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram1": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_organizationID1": {
+      "main": [
+        [
+          {
+            "node": "If7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If7": {
+      "main": [
+        [
+          {
+            "node": "Wait5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait5": {
+      "main": [
+        [
+          {
+            "node": "Evolution API1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution API1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "If3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If3": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items2": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get_organizationID3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_organizationID3": {
+      "main": [
+        [
+          {
+            "node": "Evolution API2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution API2": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code2": {
+      "main": [
+        [
+          {
+            "node": "If4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If4": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items3": {
+      "main": [
+        [
+          {
+            "node": "Telegram3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "get_organizationID4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram3": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_organizationID4": {
+      "main": [
+        [
+          {
+            "node": "Evolution API3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Evolution API4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution API3": {
+      "main": [
+        [
+          {
+            "node": "Wait3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution API4": {
+      "main": [
+        [
+          {
+            "node": "Wait3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait6": {
+      "main": [
+        [
+          {
+            "node": "Evolution API3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait8": {
+      "main": [
+        [
+          {
+            "node": "Evolution API4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait3": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Bogota",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "lanzamientos-flow-v1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6547dd852a22e21e8b713b5ffd9b911a46ad62396965db3e50134eee6647b03f"
+  },
+  "id": "lanzamientos-flow",
+  "tags": [
+    {
+      "id": "j4iOdfiDcENd72Eq",
+      "name": "Blaster"
+    }
+  ]
+}

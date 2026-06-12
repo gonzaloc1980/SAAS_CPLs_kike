@@ -147,7 +147,7 @@ const VincularManager = ({ userId, userEmail }: VincularManagerProps) => {
             Vincular Dispositivo WhatsApp
           </CardTitle>
           <CardDescription className="text-gray-400">
-            Genera un código QR para vincular tu WhatsApp al sistema Evolution API
+            Genera un código QR para vincular tu WhatsApp al sistema
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -4,15 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Users, Video, Image, LogIn } from "lucide-react";
 import ContactForm from "@/components/ContactForm";
+import blasterLogo from '../assets/blaster.jpg';
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-black text-white">
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
-            CPL Manager
-          </h1>
+          <img 
+            src={blasterLogo}
+            alt="Blaster Logo" 
+            className="mx-auto mb-6 h-24 md:h-32 w-auto object-contain"
+          />
           <p className="text-xl text-gray-400 mb-8 max-w-3xl mx-auto">
             Gestiona tu Contenido Programado de Lanzamiento multimedia de forma eficiente. 
             Crea CPLs con texto, video, imágenes y audio para tus grupos de destino.
@@ -47,7 +50,7 @@ const Index = () => {
             </CardHeader>
             <CardContent>
               <CardDescription className="text-gray-400">
-                Soporte completo para texto, video, imágenes y audio en un solo CPL
+                Soporte completo en formatos de texto, video, imágen y audio para tus CPL's
               </CardDescription>
             </CardContent>
           </Card>
@@ -81,10 +84,10 @@ const Index = () => {
         <div className="mb-16">
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-white mb-4">
-              ¿Interesado en CPL Manager?
+              ¿Interesado en Blaster?
             </h2>
             <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-              Solicita una asesoría personalizada y descubre cómo CPL Manager puede transformar tu gestión de contenido multimedia
+              Descubre cómo Blaster puede transformar tu gestión de contenido multimedia
             </p>
           </div>
           <ContactForm />
@@ -94,7 +97,7 @@ const Index = () => {
           <Card className="bg-gray-900 border-gray-800 max-w-4xl mx-auto">
             <CardHeader>
               <CardTitle className="text-2xl text-white">
-                ¿Por qué elegir CPL Manager?
+                ¿Por qué elegir Blaster?
               </CardTitle>
             </CardHeader>
             <CardContent className="text-left">
@@ -104,7 +107,7 @@ const Index = () => {
                     Multi-tipo de Contenido
                   </h3>
                   <p className="text-gray-400 mb-4">
-                    Combina texto, videos de YouTube, imágenes y audios en un solo CPL para máximo impacto.
+                    Envía contenidos de texto, video, imágen ó audio para crear CPL´s de alto impacto.
                   </p>
                   
                   <h3 className="text-lg font-semibold text-purple-400 mb-2">

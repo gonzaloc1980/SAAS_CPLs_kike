@@ -5,7 +5,15 @@ import { User, Session } from '@supabase/supabase-js';
 import { Navigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LogOut, Plus } from 'lucide-react';
+import { LogOut, Plus, Play, Loader2, Database } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import GruposManager from '@/components/GruposManager';
 import CplsManager from '@/components/CplsManager';
@@ -13,7 +21,9 @@ import VincularManager from '@/components/VincularManager';
 import OrganizationsManager from '@/components/OrganizationsManager';
 import OrganizationSelector from '@/components/OrganizationSelector';
 import UsersManager from '@/components/UsersManager';
+import CplLanzamientosManager from '@/components/CplLanzamientosManager';
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
+import blasterLogo from '../assets/blaster_transparente.png';
 
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -26,6 +36,9 @@ const Dashboard = () => {
     name: string;
     role: string;
   }>({ id: null, name: '', role: 'user' });
+  const [hotmartDialogOpen, setHotmartDialogOpen] = useState(false);
+  const [hotmartLoading, setHotmartLoading] = useState(false);
+  const [hotmartResult, setHotmartResult] = useState<{ success: boolean; message: string; url?: string; inserted?: number; skipped?: number; total?: number; errors?: string[] } | null>(null);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -140,13 +153,67 @@ const Dashboard = () => {
   const getTabsGridCols = () => {
     if (userRole === 'super_admin') {
       return selectedOrganization.id 
-        ? (userProfile?.vinculado === false ? 'grid-cols-5' : 'grid-cols-4')
+        ? (userProfile?.vinculado === false ? 'grid-cols-6' : 'grid-cols-5')
         : 'grid-cols-1';
     }
     if (userRole === 'admin') {
-      return userProfile?.vinculado === false ? 'grid-cols-4' : 'grid-cols-3';
+      return userProfile?.vinculado === false ? 'grid-cols-5' : 'grid-cols-4';
     }
-    return userProfile?.vinculado === false ? 'grid-cols-3' : 'grid-cols-2';
+    return userProfile?.vinculado === false ? 'grid-cols-4' : 'grid-cols-3';
+  };
+
+  const handleHotmartLogin = async () => {
+    setHotmartLoading(true);
+    setHotmartResult(null);
+    try {
+      const SCRIPTS_SERVER_URL = import.meta.env.VITE_SCRIPTS_SERVER_URL || 'http://localhost:3001';
+      const response = await fetch(`${SCRIPTS_SERVER_URL}/run-hotmart-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      setHotmartResult(data);
+      if (data.success) {
+        toast.success('Login en Hotmart exitoso');
+      } else {
+        toast.error(`Error: ${data.error}`);
+      }
+    } catch (err: any) {
+      const msg = err.message?.includes('Failed to fetch')
+        ? 'No se pudo conectar al servidor local. Asegúrate de que esté corriendo: cd scripts && node server.js'
+        : err.message;
+      setHotmartResult({ success: false, message: msg });
+      toast.error(msg);
+    } finally {
+      setHotmartLoading(false);
+    }
+  };
+
+  const handleHotmartScrape = async () => {
+    setHotmartLoading(true);
+    setHotmartResult(null);
+    try {
+      const SCRIPTS_SERVER_URL = import.meta.env.VITE_SCRIPTS_SERVER_URL || 'http://localhost:3001';
+      const response = await fetch(`${SCRIPTS_SERVER_URL}/run-hotmart-scrape`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await response.json();
+      setHotmartResult(data);
+      if (data.success) {
+        toast.success(`✅ ${data.inserted ?? 0} ventas guardadas en la base de datos`);
+      } else {
+        toast.error(`Error: ${data.error}`);
+      }
+    } catch (err: any) {
+      const msg = err.message?.includes('Failed to fetch')
+        ? 'No se pudo conectar al servidor local. Asegúrate de que esté corriendo: cd scripts && node server.js'
+        : err.message;
+      setHotmartResult({ success: false, message: msg });
+      toast.error(msg);
+    } finally {
+      setHotmartLoading(false);
+    }
   };
 
   const handleSignOut = async () => {
@@ -156,7 +223,7 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-white">Cargando...</div>
       </div>
     );
@@ -168,10 +235,10 @@ const Dashboard = () => {
 
   return (
     <OrganizationProvider user={user}>
-      <div className="min-h-screen bg-gray-950 text-white">
+      <div className="min-h-screen bg-black text-white">
         <header className="bg-gray-900 border-b border-gray-800 p-4">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-blue-400">CPL Manager</h1>
+            <img src={blasterLogo} alt="Blaster" className="h-12 md:h-14 w-auto object-contain" />
             <div className="flex items-center gap-4">
               {userRole !== 'super_admin' && selectedOrganization.id && (
                 <OrganizationSelector
@@ -179,6 +246,17 @@ const Dashboard = () => {
                   onOrganizationChange={handleOrganizationChange}
                   userRole={userRole}
                 />
+              )}
+              {userRole === 'super_admin' && (
+                <Button
+                  onClick={() => { setHotmartResult(null); setHotmartDialogOpen(true); }}
+                  variant="outline"
+                  size="sm"
+                  className="border-orange-600 text-orange-400 hover:bg-orange-900/30"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Hotmart Login
+                </Button>
               )}
               <span className="text-gray-400">{user.email}</span>
               <Button
@@ -212,6 +290,12 @@ const Dashboard = () => {
                     className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
                   >
                     CPLs
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="lanzamientos" 
+                    className="data-[state=active]:bg-purple-600 data-[state=active]:text-white"
+                  >
+                    Lanzamientos
                   </TabsTrigger>
                   <TabsTrigger 
                     value="grupos" 
@@ -250,6 +334,10 @@ const Dashboard = () => {
                 <TabsContent value="cpls" className="mt-6">
                   <CplsManager userId={user.id} />
                 </TabsContent>
+
+                <TabsContent value="lanzamientos" className="mt-6">
+                  <CplLanzamientosManager userId={user.id} />
+                </TabsContent>
                 
                 <TabsContent value="grupos" className="mt-6">
                   <GruposManager userId={user.id} />
@@ -277,6 +365,98 @@ const Dashboard = () => {
           </Tabs>
         </main>
       </div>
+
+      {/* Diálogo Hotmart Login - solo super_admin */}
+      <Dialog open={hotmartDialogOpen} onOpenChange={setHotmartDialogOpen}>
+        <DialogContent className="bg-gray-900 border-gray-700 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-orange-400">Hotmart — Automatización</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Usa las credenciales del archivo{' '}
+              <code className="text-orange-300">scripts/.env</code> para operar en Hotmart.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!hotmartResult && (
+            <div className="text-sm text-gray-400 space-y-2 py-2">
+              <p>Asegúrate de que el servidor local esté corriendo:</p>
+              <pre className="bg-gray-800 rounded p-2 text-xs text-green-400 overflow-auto">
+                cd scripts{'\n'}
+                npm install{'\n'}
+                node server.js
+              </pre>
+              <p className="text-xs text-yellow-400 mt-2">
+                ⚠️ Para guardar en la DB también necesitas{' '}
+                <code>SUPABASE_SERVICE_ROLE_KEY</code> en scripts/.env
+              </p>
+            </div>
+          )}
+
+          {hotmartResult && (
+            <div className={`rounded p-3 text-sm mt-2 space-y-1 ${hotmartResult.success ? 'bg-green-900/40 border border-green-700 text-green-300' : 'bg-red-900/40 border border-red-700 text-red-300'}`}>
+              <p className="font-semibold">{hotmartResult.success ? '✅ Éxito' : '❌ Error'}</p>
+              <p>{hotmartResult.message || (hotmartResult as any).error}</p>
+              {hotmartResult.total !== undefined && (
+                <div className="text-xs text-gray-300 mt-2 space-y-0.5">
+                  <p>• Total scrapeadas: <strong>{hotmartResult.total}</strong></p>
+                  <p>• Guardadas en DB: <strong>{hotmartResult.inserted}</strong></p>
+                  {(hotmartResult.skipped ?? 0) > 0 && (
+                    <p>• Con error/duplicadas: <strong>{hotmartResult.skipped}</strong></p>
+                  )}
+                </div>
+              )}
+              {hotmartResult.url && (
+                <p className="text-xs text-gray-400 break-all">URL: {hotmartResult.url}</p>
+              )}
+              {hotmartResult.errors && hotmartResult.errors.length > 0 && (
+                <details className="text-xs text-red-300 mt-1">
+                  <summary className="cursor-pointer">Ver errores</summary>
+                  <pre className="mt-1 whitespace-pre-wrap">{hotmartResult.errors.join('\n')}</pre>
+                </details>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 mt-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-gray-600 text-gray-300 hover:bg-gray-800"
+              onClick={() => setHotmartDialogOpen(false)}
+              disabled={hotmartLoading}
+            >
+              Cerrar
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-orange-600 text-orange-400 hover:bg-orange-900/30"
+              onClick={handleHotmartLogin}
+              disabled={hotmartLoading}
+            >
+              {hotmartLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 mr-2" />
+              )}
+              Solo Login
+            </Button>
+            <Button
+              size="sm"
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+              onClick={handleHotmartScrape}
+              disabled={hotmartLoading}
+            >
+              {hotmartLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Database className="h-4 w-4 mr-2" />
+              )}
+              Login + Scrapear Ventas
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </OrganizationProvider>
   );
 };

@@ -7,7 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, X, Phone } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Plus, Edit, Trash2, X, Phone, Download, Loader2, Search, Users, Copy, Link2, MessageSquare } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { useOrganization } from '@/contexts/OrganizationContext';
 
@@ -18,11 +22,33 @@ interface Grupo {
   estado: string;
   numeros_whatsapp: string[];
   created_at: string;
+  identificador_meta: string | null;
+  mensaje_bienvenida: string | null;
+  enlace_invitacion: string | null;
+}
+
+interface EvolutionGroup {
+  id: string;
+  subject: string;
+  owner?: string;
+  subjectOwner?: string;
+  participants?: Array<{
+    id: string;
+    admin: 'admin' | 'superadmin' | null;
+    phoneNumber?: string;
+  }>;
 }
 
 interface GruposManagerProps {
   userId: string;
 }
+
+const EVOLUTION_API_URL = 'https://agendador-evolution-api.6qgqpv.easypanel.host';
+const EVOLUTION_API_KEY = '429683C4C977415CAAFCCE10F7D57E11';
+
+const extractNumberFromJid = (jid: string): string => {
+  return jid.replace(/@.*$/, '').replace(/\D/g, '');
+};
 
 const GruposManager = ({ userId }: GruposManagerProps) => {
   const { selectedOrganization } = useOrganization();
@@ -33,11 +59,32 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
   const [numerosWhatsapp, setNumerosWhatsapp] = useState<string[]>(['']);
   const [loading, setLoading] = useState(false);
 
+  // Import from WhatsApp states
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [loadingEvolutionGroups, setLoadingEvolutionGroups] = useState(false);
+  const [importingGroups, setImportingGroups] = useState(false);
+  const [evolutionGroups, setEvolutionGroups] = useState<EvolutionGroup[]>([]);
+  const [selectedEvolutionGroups, setSelectedEvolutionGroups] = useState<Set<string>>(new Set());
+  const [searchFilter, setSearchFilter] = useState('');
+
+  // Org data for building landing links
+  const [orgApiKey, setOrgApiKey] = useState('');
+
+  // Per-grupo meta link state
+  const [generatingMeta, setGeneratingMeta] = useState<Record<string, boolean>>({});
+
+
   useEffect(() => {
     if (selectedOrganization) {
       fetchGrupos();
     }
   }, [userId, selectedOrganization]);
+
+  useEffect(() => {
+    if (selectedOrganization) {
+      fetchOrgData();
+    }
+  }, [selectedOrganization?.id]);
 
   const fetchGrupos = async () => {
     if (!selectedOrganization) return;
@@ -188,20 +235,392 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
     setNumerosWhatsapp(['']);
   };
 
+  const fetchOrgData = async () => {
+    if (!selectedOrganization?.id) return;
+    const { data } = await supabase
+      .from('organizations')
+      .select('whatsapp_api_key')
+      .eq('id', selectedOrganization.id)
+      .single();
+    if (data) {
+      setOrgApiKey(data.whatsapp_api_key || '');
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success('Copiado al portapapeles');
+  };
+
+  const generateMetaLink = async (grupo: Grupo) => {
+    setGeneratingMeta(prev => ({ ...prev, [grupo.id]: true }));
+    try {
+      // 1. Generate a unique identifier if not already set
+      let identificador = grupo.identificador_meta;
+      if (!identificador) {
+        let found = false;
+        for (let i = 0; i < 10 && !found; i++) {
+          const hex = Math.random().toString(16).slice(2, 8);
+          const candidate = `GRP-${hex}`;
+          const { data: existing } = await supabase
+            .from('grupos')
+            .select('id')
+            .eq('identificador_meta', candidate)
+            .maybeSingle();
+          if (!existing) {
+            identificador = candidate;
+            found = true;
+          }
+        }
+        if (!identificador) throw new Error('No se pudo generar un identificador único');
+      }
+
+      // 2. Fetch the group invite link from Evolution API
+      let enlace = grupo.enlace_invitacion;
+      if (!enlace && orgApiKey && grupo.id_grupo) {
+        try {
+          const inviteRes = await fetch(
+            `${EVOLUTION_API_URL}/group/inviteCode/${encodeURIComponent(orgApiKey)}?groupJid=${encodeURIComponent(grupo.id_grupo)}`,
+            { headers: { 'apikey': EVOLUTION_API_KEY } }
+          );
+          if (inviteRes.ok) {
+            const inviteData = await inviteRes.json();
+            enlace = inviteData.inviteUrl ||
+              (inviteData.inviteCode ? `https://chat.whatsapp.com/${inviteData.inviteCode}` : enlace);
+          }
+        } catch {
+          // Continue without invite link if the fetch fails
+        }
+      }
+
+      // 3. Persist to DB
+      const { error } = await supabase
+        .from('grupos')
+        .update({ identificador_meta: identificador, enlace_invitacion: enlace })
+        .eq('id', grupo.id);
+      if (error) throw error;
+
+      toast.success('Enlace generado exitosamente');
+      await fetchGrupos();
+    } catch (error: any) {
+      toast.error('Error al generar enlace: ' + error.message);
+    } finally {
+      setGeneratingMeta(prev => ({ ...prev, [grupo.id]: false }));
+    }
+  };
+
+  const fetchEvolutionGroups = async () => {
+    setLoadingEvolutionGroups(true);
+    setEvolutionGroups([]);
+    setSelectedEvolutionGroups(new Set());
+    setSearchFilter('');
+
+    try {
+      // 1. Get instanceName from organization's whatsapp_api_key
+      if (!selectedOrganization?.id) {
+        toast.error('Selecciona una organización primero.');
+        return;
+      }
+
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .select('whatsapp_api_key')
+        .eq('id', selectedOrganization.id)
+        .single();
+
+      if (orgError || !orgData?.whatsapp_api_key) {
+        toast.error('No se encontró instancia configurada para esta organización.');
+        return;
+      }
+
+      const instanceName = orgData.whatsapp_api_key;
+
+      // 2. Get connected instance info to obtain ownerJid
+      const instancesRes = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
+        headers: { 'apikey': EVOLUTION_API_KEY }
+      });
+
+      if (!instancesRes.ok) throw new Error('Error al obtener instancias');
+
+      const instances = await instancesRes.json();
+
+      const connectedInstance = instances.find((inst: any) =>
+        inst.name === instanceName && inst.connectionStatus === 'open'
+      );
+
+      if (!connectedInstance) {
+        toast.error('No hay instancia conectada. Vincula tu WhatsApp primero.');
+        return;
+      }
+
+      const ownerJid = connectedInstance.ownerJid || '';
+      const ownerNumber = ownerJid ? extractNumberFromJid(ownerJid) : '';
+
+      // 3. Fetch all groups with participants
+      const groupsRes = await fetch(
+        `${EVOLUTION_API_URL}/group/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=true`,
+        { headers: { 'apikey': EVOLUTION_API_KEY } }
+      );
+
+      if (!groupsRes.ok) throw new Error('Error al obtener grupos de WhatsApp');
+
+      const allGroups: EvolutionGroup[] = await groupsRes.json();
+
+      // 4. Filter groups where user is admin
+      const adminGroups = allGroups.filter(group => {
+        // Check if the instance owns the group (owner may be @lid or @s.whatsapp.net)
+        if (ownerJid && (group.owner === ownerJid || group.subjectOwner === ownerJid)) {
+          return true;
+        }
+
+        // Check participants for admin role — id is @lid format, phoneNumber has the real JID
+        if (group.participants) {
+          return group.participants.some(p => {
+            if (p.admin !== 'admin' && p.admin !== 'superadmin') return false;
+            // Direct JID match on phoneNumber field
+            if (p.phoneNumber === ownerJid) return true;
+            // Number-only comparison against phoneNumber
+            if (ownerNumber && p.phoneNumber) {
+              return extractNumberFromJid(p.phoneNumber) === ownerNumber;
+            }
+            return false;
+          });
+        }
+
+        return false;
+      });
+
+      // 5. Deduplicate by id
+      const uniqueGroups = Array.from(
+        new Map(adminGroups.map(g => [g.id, g])).values()
+      );
+
+      // 6. Exclude already imported groups
+      const existingJids = new Set(
+        grupos.filter(g => g.id_grupo).map(g => g.id_grupo)
+      );
+      const newGroups = uniqueGroups.filter(g => !existingJids.has(g.id));
+
+      setEvolutionGroups(newGroups);
+      setShowImportDialog(true);
+
+      if (newGroups.length === 0) {
+        toast.info('No se encontraron grupos nuevos donde seas administrador');
+      }
+    } catch (error: any) {
+      toast.error('Error al cargar grupos de WhatsApp: ' + error.message);
+    } finally {
+      setLoadingEvolutionGroups(false);
+    }
+  };
+
+  const toggleGroupSelection = (groupId: string) => {
+    setSelectedEvolutionGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const filtered = filteredEvolutionGroups;
+    if (selectedEvolutionGroups.size === filtered.length && filtered.length > 0) {
+      setSelectedEvolutionGroups(new Set());
+    } else {
+      setSelectedEvolutionGroups(new Set(filtered.map(g => g.id)));
+    }
+  };
+
+  const filteredEvolutionGroups = evolutionGroups.filter(g =>
+    g.subject.toLowerCase().includes(searchFilter.toLowerCase())
+  );
+
+  const importSelectedGroups = async () => {
+    if (selectedEvolutionGroups.size === 0) {
+      toast.error('Selecciona al menos un grupo para importar');
+      return;
+    }
+
+    setImportingGroups(true);
+    try {
+      const groupsToImport = evolutionGroups.filter(g => selectedEvolutionGroups.has(g.id));
+
+      const inserts = groupsToImport.map(g => ({
+        nombre: g.subject,
+        id_grupo: g.id,
+        user_id: userId,
+        organization_id: selectedOrganization?.id,
+        estado: 'Creado',
+        numeros_whatsapp: [] as string[]
+      }));
+
+      const { error } = await supabase
+        .from('grupos')
+        .insert(inserts);
+
+      if (error) throw error;
+
+      toast.success(`${groupsToImport.length} grupo(s) importado(s) exitosamente`);
+      setShowImportDialog(false);
+      setEvolutionGroups([]);
+      setSelectedEvolutionGroups(new Set());
+      fetchGrupos();
+    } catch (error: any) {
+      toast.error('Error al importar grupos: ' + error.message);
+    } finally {
+      setImportingGroups(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-white">Gestión de Grupos</h2>
         {selectedOrganization && (
-          <Button
-            onClick={() => setShowForm(true)}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Grupo
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={fetchEvolutionGroups}
+              disabled={loadingEvolutionGroups}
+              variant="outline"
+              className="border-green-700 text-green-400 hover:bg-green-900"
+            >
+              {loadingEvolutionGroups ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Cargando...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Importar desde WhatsApp
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={() => setShowForm(true)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Grupo
+            </Button>
+          </div>
         )}
       </div>
+
+      {/* Dialog para importar grupos desde WhatsApp */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="bg-gray-900 border-gray-700 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Users className="h-5 w-5 text-green-400" />
+              Importar Grupos de WhatsApp
+            </DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Selecciona los grupos donde eres administrador para importarlos.
+            </DialogDescription>
+          </DialogHeader>
+
+          {evolutionGroups.length > 0 && (
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Buscar grupo..."
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white pl-9"
+              />
+            </div>
+          )}
+
+          {evolutionGroups.length > 0 && (
+            <div className="flex items-center gap-2 px-1">
+              <Checkbox
+                id="select-all"
+                checked={filteredEvolutionGroups.length > 0 && selectedEvolutionGroups.size === filteredEvolutionGroups.length}
+                onCheckedChange={toggleSelectAll}
+              />
+              <Label htmlFor="select-all" className="text-sm text-gray-300 cursor-pointer">
+                Seleccionar todos ({filteredEvolutionGroups.length})
+              </Label>
+              {selectedEvolutionGroups.size > 0 && (
+                <Badge className="bg-blue-600 text-white ml-auto">
+                  {selectedEvolutionGroups.size} seleccionado(s)
+                </Badge>
+              )}
+            </div>
+          )}
+
+          <ScrollArea className="max-h-[350px] pr-2">
+            <div className="space-y-1">
+              {filteredEvolutionGroups.length === 0 ? (
+                <p className="text-gray-500 text-center py-6 text-sm">
+                  {evolutionGroups.length === 0
+                    ? 'No se encontraron grupos donde seas administrador.'
+                    : 'No hay grupos que coincidan con la búsqueda.'}
+                </p>
+              ) : (
+                filteredEvolutionGroups.map((group) => (
+                  <div
+                    key={group.id}
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 cursor-pointer transition-colors"
+                    onClick={() => toggleGroupSelection(group.id)}
+                  >
+                    <Checkbox
+                      checked={selectedEvolutionGroups.has(group.id)}
+                      onCheckedChange={() => toggleGroupSelection(group.id)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-medium truncate">
+                        {group.subject}
+                      </p>
+                      <p className="text-gray-500 text-xs truncate">
+                        {group.id}
+                      </p>
+                    </div>
+                    {group.participants && (
+                      <span className="text-xs text-gray-500 flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {group.participants.length}
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setShowImportDialog(false)}
+              className="border-gray-700 text-gray-300 hover:bg-gray-800"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={importSelectedGroups}
+              disabled={selectedEvolutionGroups.size === 0 || importingGroups}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {importingGroups ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Importando...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Importar ({selectedEvolutionGroups.size})
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {showForm && (
         <Card className="bg-gray-900 border-gray-800">
@@ -386,6 +805,58 @@ const GruposManager = ({ userId }: GruposManagerProps) => {
                     </AlertDialog>
                   </div>
                 </div>
+
+                {/* Meta Ads link section — only for grupos that are fully created */}
+                {grupo.estado === 'Creado' && grupo.id_grupo && (
+                  <div className="mt-4 pt-4 border-t border-gray-700">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-blue-400 flex items-center gap-1.5">
+                        <Link2 className="h-4 w-4" />
+                        Enlace para Meta Ads
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => generateMetaLink(grupo)}
+                        disabled={generatingMeta[grupo.id]}
+                        className="border-blue-700 text-blue-400 hover:bg-blue-900 h-7 text-xs px-2"
+                      >
+                        {generatingMeta[grupo.id] ? (
+                          <><Loader2 className="h-3 w-3 mr-1 animate-spin" />Generando...</>
+                        ) : grupo.identificador_meta ? 'Generar Enlace Meta' : 'Generar Enlace Meta'}
+                      </Button>
+                    </div>
+
+                    {!grupo.identificador_meta && (
+                      <p className="text-xs text-gray-500">
+                        Genera un enlace único para usar en formularios de Meta cuando no permiten enlaces directos de grupos de WhatsApp.
+                      </p>
+                    )}
+
+                    {grupo.identificador_meta && (
+                      <>
+                        <div className="bg-gray-800 rounded-lg p-3 mb-3">
+                          <p className="text-xs text-gray-400 mb-1.5">🔗 Enlace para formularios de Meta Ads:</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-green-300 break-all flex-1 font-mono">
+                              {`${window.location.origin}/join/${grupo.identificador_meta}`}
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => copyToClipboard(`${window.location.origin}/join/${grupo.identificador_meta}`)}
+                              className="text-gray-400 hover:text-white shrink-0 h-7 w-7 p-0"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+
+
+                      </>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))
