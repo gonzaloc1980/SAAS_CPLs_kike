@@ -4,7 +4,107 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Clock, CheckCircle2, XCircle, AlertTriangle, Hourglass, TimerOff } from 'lucide-react';
+import { RefreshCw, Clock, CheckCircle2, XCircle, AlertTriangle, Hourglass, TimerOff, Wifi, WifiOff } from 'lucide-react';
+
+interface InstanceStatus {
+  name: string;
+  connectionStatus: string;
+  messageCount: number;
+  disconnectionAt: string | null;
+  updatedAt: string | null;
+}
+
+const INSTANCES_REFRESH_MS = 60000;
+
+const formatearFechaRelativa = (iso: string | null) => {
+  if (!iso) return null;
+  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+  if (dias <= 0) return 'hoy';
+  if (dias === 1) return 'hace 1 día';
+  return `hace ${dias} días`;
+};
+
+const InstancesStatus = () => {
+  const [instances, setInstances] = useState<InstanceStatus[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchInstances = useCallback(async () => {
+    const { data, error: invokeError } = await supabase.functions.invoke<any>('evolution-instances-status');
+    if (invokeError) {
+      setError('No se pudo cargar el estado de las instancias.');
+      console.error('Error cargando instancias:', invokeError);
+    } else if (data?.error) {
+      setError(data.error);
+    } else {
+      const list: InstanceStatus[] = data?.instances || [];
+      setInstances(list);
+      setError(null);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchInstances();
+    const interval = setInterval(fetchInstances, INSTANCES_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [fetchInstances]);
+
+  if (loading) {
+    return <div className="text-gray-400 text-sm py-4">Cargando estado de instancias...</div>;
+  }
+
+  if (error) {
+    return (
+      <Card className="bg-gray-900 border-gray-800">
+        <CardContent className="p-4 text-sm text-red-400">{error}</CardContent>
+      </Card>
+    );
+  }
+
+  const desconectadas = (instances || [])
+    .filter((i) => i.connectionStatus !== 'open')
+    .sort((a, b) => b.messageCount - a.messageCount);
+  const conectadas = (instances || []).filter((i) => i.connectionStatus === 'open');
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-white">Estado de instancias de WhatsApp</h3>
+        <span className="text-xs text-gray-500">
+          {conectadas.length} conectadas · {desconectadas.length} desconectadas de {(instances || []).length} totales
+        </span>
+      </div>
+
+      {desconectadas.length === 0 ? (
+        <Card className="bg-gray-900 border-gray-800">
+          <CardContent className="p-4 text-sm text-green-400 flex items-center gap-2">
+            <Wifi className="h-4 w-4" /> Todas las instancias están conectadas.
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {desconectadas.map((i) => (
+            <Card key={i.name} className="bg-gray-900 border-gray-800">
+              <CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 min-w-0">
+                  <WifiOff className="h-4 w-4 text-red-400 shrink-0" />
+                  <span className="text-white text-sm font-medium truncate">{i.name}</span>
+                  {i.messageCount > 0 && (
+                    <span className="text-xs text-gray-500 whitespace-nowrap">{i.messageCount.toLocaleString('es-CO')} mensajes históricos</span>
+                  )}
+                </div>
+                <Badge className="bg-red-900/40 text-red-300 border border-red-700 whitespace-nowrap">
+                  Desconectada {formatearFechaRelativa(i.disconnectionAt) ? `· ${formatearFechaRelativa(i.disconnectionAt)}` : ''}
+                </Badge>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface CplMonitorRow {
   id: string;
@@ -71,8 +171,7 @@ const CplMonitor = () => {
 
   const fetchRows = useCallback(async () => {
     const { dia } = obtenerDiaYFechaBogota();
-    const { data, error } = await supabase
-      .from('cpls')
+    const { data, error } = await (supabase.from('cpls') as any)
       .select(
         'id, hora_colombia, tipo_cpl, mensaje_x_dia, imagen_texto, texto_video, audio_texto, destinatario_persona_grupo, estado, ultimo_resultado, ultimo_motivo, ultimo_intento_at, ultimo_envio_fecha, organization_id, organizations(name)'
       )
@@ -139,6 +238,8 @@ const CplMonitor = () => {
           Actualizar ahora
         </Button>
       </div>
+
+      <InstancesStatus />
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {(['enviado', 'pendiente', 'atrasado', 'error', 'saltado'] as EstadoCalculado[]).map((key) => (
