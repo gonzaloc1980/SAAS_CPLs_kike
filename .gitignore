@@ -16,6 +16,9 @@ dist-ssr
 scripts/.env
 scripts/node_modules/
 
+# Archivos de trabajo/depuración de n8n - contienen la service role key embebida
+n8n-fix/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -21,6 +21,7 @@ import VincularManager from '@/components/VincularManager';
 import OrganizationsManager from '@/components/OrganizationsManager';
 import OrganizationSelector from '@/components/OrganizationSelector';
 import UsersManager from '@/components/UsersManager';
+import CplMonitor from '@/components/CplMonitor';
 import CplLanzamientosManager from '@/components/CplLanzamientosManager';
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import blasterLogo from '../assets/blaster_transparente.png';
@@ -152,9 +153,9 @@ const Dashboard = () => {
 
   const getTabsGridCols = () => {
     if (userRole === 'super_admin') {
-      return selectedOrganization.id 
-        ? (userProfile?.vinculado === false ? 'grid-cols-6' : 'grid-cols-5')
-        : 'grid-cols-1';
+      return selectedOrganization.id
+        ? (userProfile?.vinculado === false ? 'grid-cols-7' : 'grid-cols-6')
+        : 'grid-cols-2';
     }
     if (userRole === 'admin') {
       return userProfile?.vinculado === false ? 'grid-cols-5' : 'grid-cols-4';
@@ -276,11 +277,19 @@ const Dashboard = () => {
           <Tabs defaultValue={userRole === 'super_admin' ? 'organizations' : 'cpls'} className="w-full">
             <TabsList className={`grid w-full ${getTabsGridCols()} bg-gray-900 border-gray-800`}>
               {userRole === 'super_admin' && (
-                <TabsTrigger 
-                  value="organizations" 
+                <TabsTrigger
+                  value="organizations"
                   className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
                 >
                   Organizaciones
+                </TabsTrigger>
+              )}
+              {userRole === 'super_admin' && (
+                <TabsTrigger
+                  value="monitor"
+                  className="data-[state=active]:bg-green-600 data-[state=active]:text-white"
+                >
+                  Monitoreo
                 </TabsTrigger>
               )}
               {selectedOrganization.id && (
@@ -328,7 +337,13 @@ const Dashboard = () => {
                 <OrganizationsManager userRole={userRole} />
               </TabsContent>
             )}
-            
+
+            {userRole === 'super_admin' && (
+              <TabsContent value="monitor" className="mt-6">
+                <CplMonitor />
+              </TabsContent>
+            )}
+
             {selectedOrganization.id && (
               <>
                 <TabsContent value="cpls" className="mt-6">
