@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { RefreshCw, Wifi, WifiOff, Loader2, Unplug, Trash2 } from 'lucide-react';
+import { RefreshCw, Wifi, WifiOff, Loader2, Ban, PlayCircle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface InstanceStatus {
@@ -23,6 +23,11 @@ interface InstanceStatus {
   messageCount: number;
   disconnectionAt: string | null;
   updatedAt: string | null;
+}
+
+interface OrgInfo {
+  name: string;
+  suspendida: boolean;
 }
 
 const INSTANCES_REFRESH_MS = 60000;
@@ -35,14 +40,27 @@ const formatearFechaRelativa = (iso: string | null) => {
   return `hace ${dias} días`;
 };
 
+const extraerMensajeError = async (invokeError: any, data: any): Promise<string> => {
+  if (data?.error) return data.error;
+  if (invokeError?.context && typeof invokeError.context.json === 'function') {
+    try {
+      const body = await invokeError.context.json();
+      if (body?.error) return body.error;
+    } catch {
+      // el cuerpo no era JSON, se ignora
+    }
+  }
+  return invokeError?.message || 'No se pudo completar la acción.';
+};
+
 const InstancesStatus = () => {
   const [instances, setInstances] = useState<InstanceStatus[] | null>(null);
-  const [orgNames, setOrgNames] = useState<Record<string, string>>({});
+  const [orgInfo, setOrgInfo] = useState<Record<string, OrgInfo>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  const [pendingLogout, setPendingLogout] = useState<InstanceStatus | null>(null);
+  const [pendingSuspend, setPendingSuspend] = useState<InstanceStatus | null>(null);
   const [pendingDelete, setPendingDelete] = useState<InstanceStatus | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -50,7 +68,7 @@ const InstancesStatus = () => {
   const fetchInstances = useCallback(async () => {
     const [instancesRes, orgsRes] = await Promise.all([
       supabase.functions.invoke<any>('evolution-instances-status'),
-      supabase.from('organizations').select('name, whatsapp_api_key'),
+      supabase.from('organizations').select('name, whatsapp_api_key, suspendida'),
     ]);
 
     if (instancesRes.error) {
@@ -66,11 +84,11 @@ const InstancesStatus = () => {
     }
 
     if (!orgsRes.error && orgsRes.data) {
-      const map: Record<string, string> = {};
+      const map: Record<string, OrgInfo> = {};
       for (const o of orgsRes.data as any[]) {
-        if (o.whatsapp_api_key) map[o.whatsapp_api_key] = o.name;
+        if (o.whatsapp_api_key) map[o.whatsapp_api_key] = { name: o.name, suspendida: !!o.suspendida };
       }
-      setOrgNames(map);
+      setOrgInfo(map);
     }
 
     setLoading(false);
@@ -82,7 +100,7 @@ const InstancesStatus = () => {
     return () => clearInterval(interval);
   }, [fetchInstances]);
 
-  const runAction = async (action: 'logout' | 'delete', instance: InstanceStatus) => {
+  const runAction = async (action: 'suspend' | 'unsuspend' | 'delete', instance: InstanceStatus) => {
     setActionLoading(instance.name);
     try {
       const { data, error: invokeError } = await supabase.functions.invoke<any>('evolution-instance-admin', {
@@ -90,12 +108,14 @@ const InstancesStatus = () => {
       });
 
       if (invokeError || data?.error) {
-        toast.error(data?.error || 'No se pudo completar la acción.');
+        toast.error(await extraerMensajeError(invokeError, data));
         return;
       }
 
-      if (action === 'logout') {
-        toast.success(`Instancia "${instance.name}" desconectada.`);
+      if (action === 'suspend') {
+        toast.success(`"${data.organizationName}" suspendida. El próximo envío programado se saltará automáticamente.`);
+      } else if (action === 'unsuspend') {
+        toast.success(`"${data.organizationName}" reactivada.`);
       } else if (data.organizationDeleted) {
         const c = data.cascaded || {};
         toast.success(
@@ -105,7 +125,7 @@ const InstancesStatus = () => {
         toast.success(`Instancia "${instance.name}" eliminada de Evolution API.`);
       }
 
-      setPendingLogout(null);
+      setPendingSuspend(null);
       setPendingDelete(null);
       setDeleteConfirmText('');
       fetchInstances();
@@ -131,7 +151,88 @@ const InstancesStatus = () => {
     .sort((a, b) => b.messageCount - a.messageCount);
   const conectadas = (instances || []).filter((i) => i.connectionStatus === 'open');
 
-  const nombreDe = (i: InstanceStatus) => orgNames[i.name] || i.name;
+  const nombreDe = (i: InstanceStatus) => orgInfo[i.name]?.name || i.name;
+  const estaSuspendida = (i: InstanceStatus) => !!orgInfo[i.name]?.suspendida;
+
+  const renderFila = (i: InstanceStatus, conectada: boolean) => {
+    const suspendida = estaSuspendida(i);
+    const tieneOrg = !!orgInfo[i.name];
+    return (
+      <Card key={i.name} className="bg-gray-900 border-gray-800">
+        <CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
+            {conectada ? (
+              <Wifi className="h-4 w-4 text-green-400 shrink-0" />
+            ) : (
+              <WifiOff className="h-4 w-4 text-red-400 shrink-0" />
+            )}
+            <span className="text-white text-sm font-medium truncate">{nombreDe(i)}</span>
+            {orgInfo[i.name] && <span className="text-xs text-gray-600">({i.name})</span>}
+            {suspendida && (
+              <Badge className="bg-yellow-900/40 text-yellow-300 border border-yellow-700 whitespace-nowrap">
+                Suspendida
+              </Badge>
+            )}
+            {!conectada && i.messageCount > 0 && (
+              <span className="text-xs text-gray-500 whitespace-nowrap">{i.messageCount.toLocaleString('es-CO')} mensajes históricos</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {!conectada && (
+              <Badge className="bg-red-900/40 text-red-300 border border-red-700 whitespace-nowrap">
+                Desconectada {formatearFechaRelativa(i.disconnectionAt) ? `· ${formatearFechaRelativa(i.disconnectionAt)}` : ''}
+              </Badge>
+            )}
+            {conectada && <span className="text-xs text-gray-500 whitespace-nowrap">{i.messageCount.toLocaleString('es-CO')} mensajes</span>}
+            {tieneOrg && (
+              <Button
+                variant="outline"
+                size="sm"
+                className={
+                  suspendida
+                    ? 'border-green-700 text-green-400 hover:bg-green-900/30'
+                    : 'border-yellow-700 text-yellow-400 hover:bg-yellow-900/30'
+                }
+                disabled={actionLoading === i.name}
+                onClick={() => {
+                  if (suspendida) {
+                    runAction('unsuspend', i);
+                  } else {
+                    setPendingSuspend(i);
+                  }
+                }}
+              >
+                {actionLoading === i.name ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : suspendida ? (
+                  <>
+                    <PlayCircle className="h-3.5 w-3.5 mr-1.5" />
+                    Reactivar
+                  </>
+                ) : (
+                  <>
+                    <Ban className="h-3.5 w-3.5 mr-1.5" />
+                    Suspender
+                  </>
+                )}
+              </Button>
+            )}
+            {!conectada && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-red-700 text-red-400 hover:bg-red-900/30"
+                disabled={actionLoading === i.name}
+                onClick={() => { setDeleteConfirmText(''); setPendingDelete(i); }}
+              >
+                {actionLoading === i.name ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -181,85 +282,26 @@ const InstancesStatus = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
-          {desconectadas.map((i) => (
-            <Card key={i.name} className="bg-gray-900 border-gray-800">
-              <CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-2 min-w-0">
-                  <WifiOff className="h-4 w-4 text-red-400 shrink-0" />
-                  <span className="text-white text-sm font-medium truncate">{nombreDe(i)}</span>
-                  {orgNames[i.name] && <span className="text-xs text-gray-600">({i.name})</span>}
-                  {i.messageCount > 0 && (
-                    <span className="text-xs text-gray-500 whitespace-nowrap">{i.messageCount.toLocaleString('es-CO')} mensajes históricos</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge className="bg-red-900/40 text-red-300 border border-red-700 whitespace-nowrap">
-                    Desconectada {formatearFechaRelativa(i.disconnectionAt) ? `· ${formatearFechaRelativa(i.disconnectionAt)}` : ''}
-                  </Badge>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-red-700 text-red-400 hover:bg-red-900/30"
-                    disabled={actionLoading === i.name}
-                    onClick={() => { setDeleteConfirmText(''); setPendingDelete(i); }}
-                  >
-                    {actionLoading === i.name ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <div className="space-y-2">{desconectadas.map((i) => renderFila(i, false))}</div>
       )}
 
       {conectadas.length > 0 && (
         <details className="text-sm text-gray-400" open>
           <summary className="cursor-pointer hover:text-gray-300">Ver las {conectadas.length} conectadas</summary>
-          <div className="space-y-2 mt-2">
-            {conectadas.map((i) => (
-              <Card key={i.name} className="bg-gray-900 border-gray-800">
-                <CardContent className="p-3 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Wifi className="h-4 w-4 text-green-400 shrink-0" />
-                    <span className="text-white text-sm font-medium truncate">{nombreDe(i)}</span>
-                    {orgNames[i.name] && <span className="text-xs text-gray-600">({i.name})</span>}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs text-gray-500 whitespace-nowrap">{i.messageCount.toLocaleString('es-CO')} mensajes</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-orange-700 text-orange-400 hover:bg-orange-900/30"
-                      disabled={actionLoading === i.name}
-                      onClick={() => setPendingLogout(i)}
-                    >
-                      {actionLoading === i.name ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <>
-                          <Unplug className="h-3.5 w-3.5 mr-1.5" />
-                          Desconectar
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <div className="space-y-2 mt-2">{conectadas.map((i) => renderFila(i, true))}</div>
         </details>
       )}
 
-      {/* Confirmación: desconectar (logout) - reversible */}
-      <AlertDialog open={!!pendingLogout} onOpenChange={(open) => !open && setPendingLogout(null)}>
+      {/* Confirmación: suspender - reversible, bloquea el envio a nivel de BD */}
+      <AlertDialog open={!!pendingSuspend} onOpenChange={(open) => !open && setPendingSuspend(null)}>
         <AlertDialogContent className="bg-gray-900 border-gray-700 text-white">
           <AlertDialogHeader>
-            <AlertDialogTitle>¿Desconectar esta instancia?</AlertDialogTitle>
+            <AlertDialogTitle>¿Suspender esta organización?</AlertDialogTitle>
             <AlertDialogDescription className="text-gray-400">
-              {pendingLogout && `"${nombreDe(pendingLogout)}"`} dejará de estar conectada a WhatsApp. El cliente
-              deberá volver a escanear el código QR para reconectarse. Mientras tanto, el sistema no le enviará
-              mensajes (se detecta como desconectada). Esto NO borra ningún dato.
+              {pendingSuspend && `"${nombreDe(pendingSuspend)}"`} dejará de recibir envíos de CPLs: el flujo de envío
+              revisará esta bandera y saltará su turno automáticamente (queda registrado como "saltado", sin alertas).
+              No se borra ningún dato ni se toca la instancia de WhatsApp. Puedes reactivarla en cualquier momento con
+              un clic.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -267,10 +309,10 @@ const InstancesStatus = () => {
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              className="bg-orange-600 hover:bg-orange-700 text-white"
-              onClick={() => pendingLogout && runAction('logout', pendingLogout)}
+              className="bg-yellow-600 hover:bg-yellow-700 text-white"
+              onClick={() => pendingSuspend && runAction('suspend', pendingSuspend)}
             >
-              Desconectar
+              Suspender
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -287,8 +329,8 @@ const InstancesStatus = () => {
             <AlertDialogDescription className="text-gray-400 space-y-2">
               <span className="block">
                 Esto elimina la instancia <strong className="text-white">{pendingDelete?.name}</strong> de Evolution
-                API {pendingDelete && orgNames[pendingDelete.name] && (
-                  <>y la organización <strong className="text-white">{orgNames[pendingDelete.name]}</strong></>
+                API {pendingDelete && orgInfo[pendingDelete.name] && (
+                  <>y la organización <strong className="text-white">{orgInfo[pendingDelete.name].name}</strong></>
                 )}, junto con TODOS sus CPLs, lanzamientos, grupos y accesos de usuario asociados. No se puede deshacer.
               </span>
               <span className="block">

@@ -60,24 +60,54 @@ serve(async (req) => {
       return json({ error: 'Falta instanceName' }, 400)
     }
 
-    if (action !== 'logout' && action !== 'delete') {
-      return json({ error: "action debe ser 'logout' o 'delete'" }, 400)
+    if (action !== 'suspend' && action !== 'unsuspend' && action !== 'delete') {
+      return json({ error: "action debe ser 'suspend', 'unsuspend' o 'delete'" }, 400)
     }
 
-    // --- Logout: cierra la sesion de WhatsApp, la instancia sigue existiendo ---
-    // (el cliente puede volver a conectarse escaneando el QR). No toca la BD.
-    if (action === 'logout') {
-      const evoRes = await fetch(`${EVOLUTION_API_URL}/instance/logout/${encodeURIComponent(instanceName)}`, {
-        method: 'DELETE',
-        headers: { apikey: EVOLUTION_API_KEY },
-      })
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-      if (!evoRes.ok && evoRes.status !== 404) {
-        const text = await evoRes.text().catch(() => '')
-        return json({ error: `Evolution API respondio ${evoRes.status} al desconectar: ${text}` }, 502)
+    // --- Suspender/reactivar: la fuente de verdad es organizations.suspendida. ---
+    // El workflow de n8n revisa ese campo antes de enviar y salta el envio si
+    // esta en true - no depende de que Evolution API desconecte de forma
+    // confiable (en la practica, /instance/logout de esta version de Evolution
+    // API no invalida la sesion: el cliente se reconecta solo a los segundos).
+    if (action === 'suspend' || action === 'unsuspend') {
+      const suspendida = action === 'suspend'
+
+      const { data: org, error: updateError } = await supabaseAdmin
+        .from('organizations')
+        .update({ suspendida })
+        .eq('whatsapp_api_key', instanceName)
+        .select('id, name')
+        .maybeSingle()
+
+      if (updateError) {
+        return json({ error: 'No se pudo actualizar la organización: ' + updateError.message }, 500)
       }
 
-      return json({ success: true, action: 'logout', instanceName })
+      if (!org) {
+        return json({ error: 'No se encontró ninguna organización con esa instancia.' }, 404)
+      }
+
+      // Intento adicional, best-effort: si esta suspendiendo, tambien se intenta
+      // cerrar la sesion en Evolution API. Si falla (version 2.3.7 suele
+      // devolver 500 "Connection Closed" y reconectar solo), no importa: lo
+      // que realmente bloquea el envio es el campo suspendida en la BD.
+      if (suspendida) {
+        try {
+          await fetch(`${EVOLUTION_API_URL}/instance/logout/${encodeURIComponent(instanceName)}`, {
+            method: 'DELETE',
+            headers: { apikey: EVOLUTION_API_KEY },
+          })
+        } catch (_e) {
+          // ignorado a proposito
+        }
+      }
+
+      return json({ success: true, action, instanceName, organizationName: org.name, suspendida })
     }
 
     // --- Delete: borra la instancia en Evolution API y en cascada todos los ---
@@ -106,13 +136,6 @@ serve(async (req) => {
       const text = await deleteRes.text().catch(() => '')
       return json({ error: `Evolution API respondio ${deleteRes.status} al eliminar: ${text}` }, 502)
     }
-
-    // A partir de aca usamos la service role: borrar la organizacion (y en
-    // cascada sus datos) requiere privilegios que el usuario final no tiene.
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
 
     const { data: org, error: orgError } = await supabaseAdmin
       .from('organizations')
