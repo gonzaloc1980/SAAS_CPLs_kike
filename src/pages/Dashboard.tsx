@@ -22,6 +22,7 @@ import OrganizationsManager from '@/components/OrganizationsManager';
 import OrganizationSelector from '@/components/OrganizationSelector';
 import UsersManager from '@/components/UsersManager';
 import CplMonitor from '@/components/CplMonitor';
+import InstancesStatus from '@/components/InstancesStatus';
 import CplLanzamientosManager from '@/components/CplLanzamientosManager';
 import { OrganizationProvider } from '@/contexts/OrganizationContext';
 import blasterLogo from '../assets/blaster_transparente.png';
@@ -154,8 +155,8 @@ const Dashboard = () => {
   const getTabsGridCols = () => {
     if (userRole === 'super_admin') {
       return selectedOrganization.id
-        ? (userProfile?.vinculado === false ? 'grid-cols-7' : 'grid-cols-6')
-        : 'grid-cols-2';
+        ? (userProfile?.vinculado === false ? 'grid-cols-8' : 'grid-cols-7')
+        : 'grid-cols-3';
     }
     if (userRole === 'admin') {
       return userProfile?.vinculado === false ? 'grid-cols-5' : 'grid-cols-4';
@@ -292,6 +293,14 @@ const Dashboard = () => {
                   Monitoreo
                 </TabsTrigger>
               )}
+              {userRole === 'super_admin' && (
+                <TabsTrigger
+                  value="instances"
+                  className="data-[state=active]:bg-green-600 data-[state=active]:text-white"
+                >
+                  Instancias
+                </TabsTrigger>
+              )}
               {selectedOrganization.id && (
                 <>
                   <TabsTrigger 
@@ -341,6 +350,12 @@ const Dashboard = () => {
             {userRole === 'super_admin' && (
               <TabsContent value="monitor" className="mt-6">
                 <CplMonitor />
+              </TabsContent>
+            )}
+
+            {userRole === 'super_admin' && (
+              <TabsContent value="instances" className="mt-6">
+                <InstancesStatus />
               </TabsContent>
             )}
 
