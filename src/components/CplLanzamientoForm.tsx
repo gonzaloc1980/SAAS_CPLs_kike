@@ -452,7 +452,7 @@ const CplLanzamientoForm = ({ userId, grupos, editingCpl, duplicatingCpl, onClos
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-gray-700">Fecha Inicio de Vigencia</Label>
+                  <Label className="text-gray-200">Fecha Inicio de Vigencia</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -477,7 +477,7 @@ const CplLanzamientoForm = ({ userId, grupos, editingCpl, duplicatingCpl, onClos
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-gray-700">Fecha Fin de Vigencia</Label>
+                  <Label className="text-gray-200">Fecha Fin de Vigencia</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -529,7 +529,7 @@ const CplLanzamientoForm = ({ userId, grupos, editingCpl, duplicatingCpl, onClos
                 value={formData.hora}
                 onChange={(e) => setFormData(prev => ({ ...prev, hora: e.target.value }))}
                 required
-                className="bg-gray-800 border-gray-700 text-white"
+                className="bg-gray-800 border-gray-700 text-white [&::-webkit-calendar-picker-indicator]:invert"
               />
             </div>
 
