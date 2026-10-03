@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, Clock, CheckCircle2, XCircle, AlertTriangle, Hourglass, TimerOff } from 'lucide-react';
+import { RefreshCw, Clock, CheckCircle2, XCircle, AlertTriangle, Hourglass, TimerOff, Users } from 'lucide-react';
 
 interface CplMonitorRow {
   id: string;
@@ -63,6 +63,7 @@ const ESTADO_CONFIG: Record<EstadoCalculado, { label: string; className: string;
 
 const CplMonitor = () => {
   const [rows, setRows] = useState<CplMonitorRow[]>([]);
+  const [grupoNombres, setGrupoNombres] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [orgFilter, setOrgFilter] = useState<string>('todas');
@@ -71,20 +72,32 @@ const CplMonitor = () => {
 
   const fetchRows = useCallback(async () => {
     const { dia } = obtenerDiaYFechaBogota();
-    const { data, error } = await (supabase.from('cpls') as any)
-      .select(
-        'id, hora_colombia, tipo_cpl, mensaje_x_dia, imagen_texto, texto_video, audio_texto, destinatario_persona_grupo, estado, ultimo_resultado, ultimo_motivo, ultimo_intento_at, ultimo_envio_fecha, organization_id, organizations(name)'
-      )
-      .eq('dia_semana', dia)
-      .eq('estado', 'activo')
-      .order('hora_colombia', { ascending: true });
+    const [cplsRes, gruposRes] = await Promise.all([
+      (supabase.from('cpls') as any)
+        .select(
+          'id, hora_colombia, tipo_cpl, mensaje_x_dia, imagen_texto, texto_video, audio_texto, destinatario_persona_grupo, estado, ultimo_resultado, ultimo_motivo, ultimo_intento_at, ultimo_envio_fecha, organization_id, organizations(name)'
+        )
+        .eq('dia_semana', dia)
+        .eq('estado', 'activo')
+        .order('hora_colombia', { ascending: true }),
+      supabase.from('grupos').select('id_grupo, nombre'),
+    ]);
 
-    if (error) {
-      console.error('Error cargando monitoreo de CPLs:', error);
+    if (cplsRes.error) {
+      console.error('Error cargando monitoreo de CPLs:', cplsRes.error);
     } else {
-      setRows((data as unknown as CplMonitorRow[]) || []);
+      setRows((cplsRes.data as unknown as CplMonitorRow[]) || []);
       setLastRefresh(new Date());
     }
+
+    if (!gruposRes.error && gruposRes.data) {
+      const map: Record<string, string> = {};
+      for (const g of gruposRes.data as any[]) {
+        if (g.id_grupo) map[g.id_grupo] = g.nombre;
+      }
+      setGrupoNombres(map);
+    }
+
     setLoading(false);
   }, []);
 
@@ -118,6 +131,11 @@ const CplMonitor = () => {
 
   const contenidoDe = (r: CplMonitorRow) =>
     r.mensaje_x_dia || r.imagen_texto || r.texto_video || r.audio_texto || '(sin contenido)';
+
+  const destinatarioDe = (r: CplMonitorRow) => {
+    if (!r.destinatario_persona_grupo) return null;
+    return grupoNombres[r.destinatario_persona_grupo] || r.destinatario_persona_grupo;
+  };
 
   if (loading) {
     return <div className="text-gray-400 text-center py-8">Cargando monitoreo...</div>;
@@ -206,6 +224,11 @@ const CplMonitor = () => {
                       </Badge>
                     </div>
                     <p className="text-sm text-gray-400 truncate max-w-xl">{contenidoDe(r)}</p>
+                    {destinatarioDe(r) && (
+                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                        <Users className="h-3 w-3" /> {destinatarioDe(r)}
+                      </p>
+                    )}
                     {r.ultimo_motivo && (
                       <p className="text-xs text-gray-500 mt-1">Motivo: {r.ultimo_motivo}</p>
                     )}
